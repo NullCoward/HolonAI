@@ -34,8 +34,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/NullCoward/HolonAIRedux"
-Repository = "https://github.com/NullCoward/HolonAIRedux"
+Homepage = "https://github.com/NullCoward/HolonAI"
+Repository = "https://github.com/NullCoward/HolonAI"
 
 [tool.setuptools.packages.find]
 where = ["."]
