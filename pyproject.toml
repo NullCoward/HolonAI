@@ -22,25 +22,15 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "python-toon>=0.1.0",
     "cattrs>=24.1.0",
+    "tiktoken>=0.7.0",
 ]
 
 [project.optional-dependencies]
-toon = [
-    "toon>=0.1.0",
-]
-tokens = [
-    "tiktoken>=0.7.0",
-]
-all = [
-    "toon>=0.1.0",
-    "tiktoken>=0.7.0",
-]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
-    "toon>=0.1.0",
-    "tiktoken>=0.7.0",
 ]
 
 [project.urls]
