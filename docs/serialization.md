@@ -179,7 +179,7 @@ holon = (
 if holon.is_over_limit:
     print(f"Warning: {holon.token_count} exceeds limit of {holon.token_limit}")
 
-# Serialize for AI (uses TOON if available, falls back to JSON)
+# Serialize for AI (TOON format)
 prompt = serialize_for_ai(holon)
 
 # Send to AI, get response...
@@ -188,24 +188,6 @@ ai_response = call_ai(prompt)
 # Parse and dispatch
 action_calls = parse_ai_response(ai_response)
 results = holon.dispatch_many(action_calls)
-```
-
-## Installation
-
-Optional dependencies for extended functionality:
-
-```bash
-# Basic installation (JSON only)
-pip install holon-ai
-
-# With TOON support (30-60% token savings)
-pip install holon-ai[toon]
-
-# With token counting
-pip install holon-ai[tokens]
-
-# With everything
-pip install holon-ai[all]
 ```
 
 ## Architecture Notes

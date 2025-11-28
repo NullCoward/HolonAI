@@ -3,24 +3,15 @@
 ## Installation
 
 ```bash
-pip install holon-ai
-
-# With TOON serialization support (30-60% token savings)
-pip install holon-ai[toon]
-
-# With token counting support
-pip install holon-ai[tokens]
-
-# With everything
-pip install holon-ai[all]
+pip install git+https://github.com/NullCoward/HolonAI.git
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/NullCoward/HolonAIRedux.git
-cd HolonAIRedux
-pip install -e ".[all]"
+git clone https://github.com/NullCoward/HolonAI.git
+cd HolonAI
+pip install -e .
 ```
 
 ## Basic Usage
@@ -46,7 +37,7 @@ holon = (
 def get_pending_tasks():
     return db.query("SELECT * FROM tasks WHERE status = 'pending'")
 
-holon.add_self(get_pending_tasks, key="pending_tasks", bind=True)
+holon.add_self(get_pending_tasks, key="pending_tasks")
 ```
 
 ### Defining Actions
@@ -107,7 +98,7 @@ holon = (
     Holon(name="Agent")
     .with_token_limit(4000, model="gpt-4o")
     .add_purpose("You are a helpful assistant")
-    .add_self(get_context, key="context", bind=True)
+    .add_self(get_context, key="context")
     .add_action(do_something)
 )
 
@@ -159,7 +150,7 @@ main_holon = (
     Holon(name="AppContext")
     .add_purpose("You are the main application assistant")
     .add_self(db_holon, key="database")  # Nested Holon
-    .add_self(get_current_user, key="user", bind=True)
+    .add_self(get_current_user, key="user")
 )
 ```
 
@@ -188,7 +179,7 @@ holon = (
     .add_purpose("You are an executive assistant")
     .add_purpose("Help schedule meetings and manage communications")
     .add_self({"name": "Alice", "title": "CEO"}, key="executive")
-    .add_self(lambda: fetch_calendar(), key="calendar", bind=True)
+    .add_self(lambda: fetch_calendar(), key="calendar")
     .add_action(send_email, purpose="Send an email on behalf of the executive")
     .add_action(schedule_meeting, purpose="Schedule a new meeting")
 )
@@ -218,8 +209,8 @@ Holon(
 ```
 
 **Methods:**
-- `.add_purpose(item, *, key=None, bind=False)` - Add to purpose
-- `.add_self(item, *, key=None, bind=False)` - Add to self state
+- `.add_purpose(item, *, key=None)` - Add to purpose
+- `.add_self(item, *, key=None)` - Add to self state
 - `.add_action(action, *, name=None, purpose=None)` - Add an action
 - `.with_token_limit(limit, model=None)` - Set token limit (fluent)
 - `.to_dict(*, nested=False)` - Serialize to dict

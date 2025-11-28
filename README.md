@@ -22,24 +22,15 @@ A Holon is a portable AI context capsule that bundles everything an AI needs to 
 ## Installation
 
 ```bash
-pip install holon-ai
-
-# With TOON serialization (30-60% token savings)
-pip install holon-ai[toon]
-
-# With token counting
-pip install holon-ai[tokens]
-
-# With everything
-pip install holon-ai[all]
+pip install git+https://github.com/NullCoward/HolonAI.git
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/NullCoward/HolonAIRedux.git
-cd HolonAIRedux
-pip install -e ".[all]"
+git clone https://github.com/NullCoward/HolonAI.git
+cd HolonAI
+pip install -e .
 ```
 
 ## Quick Example
@@ -58,14 +49,14 @@ holon = (
     .with_token_limit(4000, model="gpt-4o")
     .add_purpose("You are a task management assistant")
     .add_self({"user": "alice"}, key="context")
-    .add_self(lambda: get_tasks(), key="tasks", bind=True)  # Dynamic binding
+    .add_self(lambda: get_tasks(), key="tasks")  # Dynamic binding
     .add_action(create_task, purpose="Create a new task")
 )
 
 # Check tokens before sending
 print(f"Using {holon.token_count} tokens ({holon.token_usage['percentage']}% of limit)")
 
-# Serialize for AI (TOON or JSON)
+# Serialize for AI (TOON format)
 prompt = serialize_for_ai(holon)
 
 # Parse AI response and dispatch actions
@@ -108,13 +99,15 @@ holon.token_usage       # Full breakdown dict
 
 ## Dependencies
 
-- **Required**: [cattrs](https://catt.rs/) - Serialization
-- **Optional**: [tiktoken](https://github.com/openai/tiktoken) - Token counting
-- **Optional**: [toon](https://github.com/toon-format/toon-python) - Token-optimized format
+- [cattrs](https://catt.rs/) - Serialization
+- [tiktoken](https://github.com/openai/tiktoken) - Token counting
+- [python-toon](https://github.com/xaviviro/python-toon) - Token-optimized format
 
 ## Development
 
 ```bash
+git clone https://github.com/NullCoward/HolonAI.git
+cd HolonAI
 pip install -e ".[dev]"
 pytest
 ```
