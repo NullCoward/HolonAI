@@ -5,8 +5,22 @@
 ```bash
 pip install holon-ai
 
-# With TOON serialization support (recommended)
+# With TOON serialization support (30-60% token savings)
 pip install holon-ai[toon]
+
+# With token counting support
+pip install holon-ai[tokens]
+
+# With everything
+pip install holon-ai[all]
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/NullCoward/HolonAIRedux.git
+cd HolonAIRedux
+pip install -e ".[all]"
 ```
 
 ## Basic Usage
@@ -14,7 +28,7 @@ pip install holon-ai[toon]
 ### Creating a Holon
 
 ```python
-from holon_ai import Holon, HolonAction
+from holon_ai import Holon
 
 # Create a Holon with fluent API
 holon = (
@@ -83,6 +97,49 @@ action_calls = parse_ai_response(ai_response)
 results = holon.dispatch_many(action_calls)
 ```
 
+## Token Management
+
+Track and limit token usage for your Holons:
+
+```python
+# Set a token limit with model for correct encoding
+holon = (
+    Holon(name="Agent")
+    .with_token_limit(4000, model="gpt-4o")
+    .add_purpose("You are a helpful assistant")
+    .add_self(get_context, key="context", bind=True)
+    .add_action(do_something)
+)
+
+# Check token usage
+print(f"Tokens used: {holon.token_count}")
+print(f"Tokens remaining: {holon.tokens_remaining}")
+print(f"Over limit: {holon.is_over_limit}")
+
+# Get full breakdown
+usage = holon.token_usage
+# {
+#   "count": 520,
+#   "limit": 4000,
+#   "remaining": 3480,
+#   "percentage": 13.0,
+#   "over_limit": False,
+#   "model": "gpt-4o"
+# }
+
+# Use in conditionals
+if holon.is_over_limit:
+    print("Warning: Context too large, consider trimming")
+```
+
+### Supported Models
+
+| Model | Encoding Used |
+|-------|---------------|
+| gpt-4o, gpt-4o-mini | o200k_base |
+| gpt-4, gpt-4-turbo, gpt-3.5-turbo | cl100k_base |
+| claude-3-* | cl100k_base (approximation) |
+
 ## Nested Holons
 
 Holons can contain other Holons for hierarchical structures:
@@ -124,9 +181,10 @@ def schedule_meeting(title: str, attendees: list[str], time: str) -> dict:
     # ... implementation ...
     return {"meeting_id": 123, "title": title}
 
-# 2. Build the Holon
+# 2. Build the Holon with token limit
 holon = (
     Holon(name="ExecutiveAssistant")
+    .with_token_limit(8000, model="gpt-4o")
     .add_purpose("You are an executive assistant")
     .add_purpose("Help schedule meetings and manage communications")
     .add_self({"name": "Alice", "title": "CEO"}, key="executive")
@@ -135,11 +193,42 @@ holon = (
     .add_action(schedule_meeting, purpose="Schedule a new meeting")
 )
 
-# 3. Serialize and send to AI
+# 3. Check tokens before sending
+print(f"Using {holon.token_count} tokens ({holon.token_usage['percentage']}% of limit)")
+
+# 4. Serialize and send to AI
 prompt = serialize_for_ai(holon)
 ai_response = your_ai_client.complete(prompt + "\n\nUser: Schedule a meeting with Bob tomorrow at 2pm")
 
-# 4. Execute the AI's chosen actions
+# 5. Execute the AI's chosen actions
 actions = parse_ai_response(ai_response)
 results = holon.dispatch_many(actions)
 ```
+
+## API Reference
+
+### Holon
+
+```python
+Holon(
+    name: str | None = None,
+    token_limit: int | None = None,
+    model: str | None = None
+)
+```
+
+**Methods:**
+- `.add_purpose(item, *, key=None, bind=False)` - Add to purpose
+- `.add_self(item, *, key=None, bind=False)` - Add to self state
+- `.add_action(action, *, name=None, purpose=None)` - Add an action
+- `.with_token_limit(limit, model=None)` - Set token limit (fluent)
+- `.to_dict(*, nested=False)` - Serialize to dict
+- `.to_json(**kwargs)` - Serialize to JSON string
+- `.dispatch(action_name, **kwargs)` - Execute single action
+- `.dispatch_many(action_calls)` - Execute multiple actions
+
+**Properties:**
+- `.token_count` - Current token count (dynamic)
+- `.tokens_remaining` - Tokens left before limit
+- `.is_over_limit` - True if over limit
+- `.token_usage` - Full usage breakdown dict
