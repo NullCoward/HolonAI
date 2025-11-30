@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python test_hud.py:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(python:*)",
+      "Bash(ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\" python -m pytest:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

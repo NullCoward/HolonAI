@@ -165,7 +165,14 @@ Each action exposes metadata for AI consumption:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Names are auto-derived in `module.path.function` format, or can be overridden.
+Names are auto-derived in `module.path.function` format, but should be overridden with explicit `name=` for predictable action dispatching:
+
+```python
+# Recommended: explicit name for predictable dispatching
+holon.add_action(create_task, name="create_task", purpose="Create a task")
+
+# Without name=, becomes: myapp.tasks.create_task (full module path)
+```
 
 ## Library Architecture
 

@@ -50,7 +50,7 @@ holon = (
     .add_purpose("You are a task management assistant")
     .add_self({"user": "alice"}, key="context")
     .add_self(lambda: get_tasks(), key="tasks")  # Callables auto-resolve
-    .add_action(create_task, purpose="Create a new task")
+    .add_action(create_task, name="create_task", purpose="Create a new task")
 )
 
 # Check tokens before sending
@@ -111,6 +111,25 @@ cd HolonAI
 pip install -e ".[dev]"
 pytest
 ```
+
+### Test Suite
+
+The library includes comprehensive tests:
+
+```bash
+# Run unit tests (134 tests)
+pytest tests/ --ignore=tests/test_ai_integration.py
+
+# Run with AI integration tests (requires API keys)
+OPENAI_API_KEY=... ANTHROPIC_API_KEY=... pytest tests/
+```
+
+Tests cover:
+- Core Holon functionality
+- Action handling and dispatch
+- Container serialization
+- Token counting
+- AI integration (OpenAI + Anthropic)
 
 ## License
 

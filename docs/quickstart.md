@@ -53,9 +53,9 @@ def complete_task(task_id: int) -> bool:
     """Mark a task as completed."""
     return db.update("tasks", task_id, {"status": "completed"})
 
-# Add actions (signature and docstring auto-extracted)
-holon.add_action(create_task, purpose="Create a new task for the user")
-holon.add_action(complete_task, purpose="Mark an existing task as done")
+# Add actions with explicit names (signature and docstring auto-extracted)
+holon.add_action(create_task, name="create_task", purpose="Create a new task for the user")
+holon.add_action(complete_task, name="complete_task", purpose="Mark an existing task as done")
 ```
 
 ### Serialization
@@ -99,7 +99,7 @@ holon = (
     .with_token_limit(4000, model="gpt-4o")
     .add_purpose("You are a helpful assistant")
     .add_self(get_context, key="context")
-    .add_action(do_something)
+    .add_action(do_something, name="do_something")
 )
 
 # Check token usage
@@ -141,8 +141,8 @@ db_holon = (
     Holon(name="DatabaseContext")
     .add_purpose("Database operation context")
     .add_self({"connection": "active", "pool_size": 10}, key="status")
-    .add_action(query_database)
-    .add_action(update_record)
+    .add_action(query_database, name="query_database")
+    .add_action(update_record, name="update_record")
 )
 
 # Parent Holon contains the child
@@ -180,8 +180,8 @@ holon = (
     .add_purpose("Help schedule meetings and manage communications")
     .add_self({"name": "Alice", "title": "CEO"}, key="executive")
     .add_self(lambda: fetch_calendar(), key="calendar")
-    .add_action(send_email, purpose="Send an email on behalf of the executive")
-    .add_action(schedule_meeting, purpose="Schedule a new meeting")
+    .add_action(send_email, name="send_email", purpose="Send an email on behalf of the executive")
+    .add_action(schedule_meeting, name="schedule_meeting", purpose="Schedule a new meeting")
 )
 
 # 3. Check tokens before sending
@@ -211,12 +211,14 @@ Holon(
 **Methods:**
 - `.add_purpose(item, *, key=None)` - Add to purpose
 - `.add_self(item, *, key=None)` - Add to self state
-- `.add_action(action, *, name=None, purpose=None)` - Add an action
+- `.add_action(action, *, name=None, purpose=None)` - Add an action (use `name=` for predictable action names)
 - `.with_token_limit(limit, model=None)` - Set token limit (fluent)
 - `.to_dict(*, nested=False)` - Serialize to dict
 - `.to_json(**kwargs)` - Serialize to JSON string
 - `.dispatch(action_name, **kwargs)` - Execute single action
 - `.dispatch_many(action_calls)` - Execute multiple actions
+
+**Note:** When adding actions, always provide an explicit `name=` parameter. Without it, the action name defaults to the full module path (e.g., `myapp.tasks.create_task`), which may not match what the AI returns.
 
 **Properties:**
 - `.token_count` - Current token count (dynamic)

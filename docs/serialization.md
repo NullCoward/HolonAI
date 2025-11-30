@@ -172,7 +172,7 @@ holon = (
     .with_token_limit(4000, model="gpt-4o")
     .add_purpose("...")
     .add_self(data, key="data")
-    .add_action(my_function)
+    .add_action(my_function, name="my_function")
 )
 
 # Check tokens before sending
