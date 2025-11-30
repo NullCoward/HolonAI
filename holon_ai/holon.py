@@ -4,12 +4,15 @@ Holon - The core object that combines Purpose, Self, and Actions.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 
 import attrs
 
 from .action import HolonAction
 from .containers import HolonActions, HolonPurpose, HolonSelf
+
+if TYPE_CHECKING:
+    from .client import ExecutionResult
 
 
 @attrs.define
@@ -29,6 +32,10 @@ class Holon:
     - token_limit: Maximum tokens allowed for this Holon's serialization
     - model: Model name for token counting (affects encoding used)
     - token_count: Current token count (dynamic property)
+
+    Execution:
+    - Use with_client() to configure an AI client (OpenAI or Anthropic)
+    - Use execute() to run the full pipeline: serialize -> AI call -> dispatch
     """
     name: str | None = None
     purpose: HolonPurpose = attrs.Factory(HolonPurpose)
@@ -37,7 +44,11 @@ class Holon:
 
     # Token management
     token_limit: int | None = None
-    model: str | None = None  # e.g., "gpt-4o", "gpt-4", "claude-3-opus"
+    model: str | None = None  # e.g., "gpt-4o", "gpt-4", "claude-sonnet-4-20250514"
+
+    # AI client for execution
+    _client: Any = attrs.field(default=None, alias="_client")
+    _max_tokens: int = attrs.field(default=4096, alias="_max_tokens")
 
     # Fluent API for building Holons
 
@@ -77,6 +88,47 @@ class Holon:
         self.token_limit = limit
         if model:
             self.model = model
+        return self
+
+    def with_client(
+        self,
+        client: Any,
+        *,
+        model: str,
+        max_tokens: int = 4096
+    ) -> Holon:
+        """
+        Configure an AI client for execution (fluent API).
+
+        Supports OpenAI and Anthropic clients directly.
+
+        Args:
+            client: An OpenAI or Anthropic client instance
+            model: Model to use (e.g., "gpt-4o", "claude-sonnet-4-20250514")
+            max_tokens: Maximum tokens in AI response
+
+        Example:
+            from openai import OpenAI
+
+            holon = (
+                Holon(name="Assistant")
+                .with_client(OpenAI(), model="gpt-4o")
+                .add_purpose("You are a helpful assistant")
+                .add_action(my_action, name="do_thing")
+            )
+        """
+        from .client import detect_client_type
+
+        client_type = detect_client_type(client)
+        if client_type is None:
+            raise TypeError(
+                f"Unsupported client type: {type(client).__name__}. "
+                "Supported clients: OpenAI, Anthropic"
+            )
+
+        self._client = client
+        self.model = model
+        self._max_tokens = max_tokens
         return self
 
     # Token counting properties
@@ -184,3 +236,69 @@ class Holon:
             result = self.dispatch(action_name, **params)
             results.append(result)
         return results
+
+    # Execution
+
+    def execute(self, user_message: str | None = None) -> "ExecutionResult":
+        """
+        Execute the full AI interaction pipeline.
+
+        1. Serialize the Holon (resolves all dynamic bindings)
+        2. Append user message if provided
+        3. Send to configured AI client
+        4. Parse the AI response for action calls
+        5. Dispatch all actions
+        6. Return results
+
+        Args:
+            user_message: Optional message from user to append to prompt
+
+        Returns:
+            ExecutionResult with prompt, response, actions, and results
+
+        Raises:
+            RuntimeError: If no client configured (use with_client first)
+
+        Example:
+            result = holon.execute("Create a new task called 'Review PR'")
+            print(result.results)  # Results from executed actions
+        """
+        from .client import ExecutionResult, call_ai
+        from .serialization import parse_ai_response, serialize_for_ai
+
+        if self._client is None:
+            raise RuntimeError(
+                "No AI client configured. Use with_client() first. "
+                "Example: holon.with_client(OpenAI(), model='gpt-4o')"
+            )
+
+        # Serialize (resolves dynamic bindings)
+        prompt = serialize_for_ai(self)
+
+        # Append user message if provided
+        if user_message:
+            prompt = f"{prompt}\n\nUser: {user_message}"
+
+        # Call AI
+        ai_response = call_ai(
+            self._client,
+            prompt,
+            model=self.model,
+            max_tokens=self._max_tokens
+        )
+
+        # Parse and dispatch
+        try:
+            actions_called = parse_ai_response(ai_response)
+        except (ValueError, Exception):
+            # AI didn't return valid action format
+            actions_called = []
+
+        results = self.dispatch_many(actions_called) if actions_called else []
+
+        return ExecutionResult(
+            prompt=prompt,
+            ai_response=ai_response,
+            actions_called=actions_called,
+            results=results
+        )

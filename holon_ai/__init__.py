@@ -11,6 +11,7 @@ __version__ = "0.1.0"
 __author__ = "NullCoward"
 
 from .action import ActionParameter, ActionSignature, HolonAction
+from .client import ExecutionResult
 from .containers import HolonActions, HolonBinding, HolonPurpose, HolonSelf
 from .converter import HolonConverter, holon_converter
 from .holon import Holon
@@ -24,6 +25,7 @@ from .tokens import TokenCounter, count_tokens, is_available as tokens_available
 __all__ = [
     # Core
     "Holon",
+    "ExecutionResult",
     # Containers
     "HolonPurpose",
     "HolonSelf",
