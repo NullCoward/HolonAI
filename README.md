@@ -49,7 +49,7 @@ holon = (
     .with_token_limit(4000, model="gpt-4o")
     .add_purpose("You are a task management assistant")
     .add_self({"user": "alice"}, key="context")
-    .add_self(lambda: get_tasks(), key="tasks")  # Dynamic binding
+    .add_self(lambda: get_tasks(), key="tasks")  # Callables auto-resolve
     .add_action(create_task, purpose="Create a new task")
 )
 
@@ -72,7 +72,7 @@ results = holon.dispatch_many(parse_ai_response(ai_response))
 
 ## Key Features
 
-- **Dynamic Bindings** - Bind to live code objects that resolve at runtime
+- **Dynamic Bindings** - Callables automatically resolve at serialization time
 - **Nested Holons** - Compose hierarchical agent structures
 - **Auto-derived Metadata** - Function signatures and docstrings extracted automatically
 - **Token Management** - Track and limit token usage with tiktoken

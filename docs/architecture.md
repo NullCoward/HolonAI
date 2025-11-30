@@ -114,15 +114,16 @@ When serialized, nested Holons are inlined without redundant framing.
 
 ## Dynamic Bindings
 
-Both `HolonPurpose` and `HolonSelf` support **dynamic bindings** — references to code objects that resolve at runtime:
+Both `HolonPurpose` and `HolonSelf` support **dynamic bindings** — callables are automatically invoked at serialization time:
 
 ```python
 holon = Holon()
-holon.add_self(get_current_user, key="user", bind=True)
-holon.add_self(db.get_pending_tasks, key="tasks", bind=True)
+holon.add_self(get_current_user, key="user")      # callable → invoked at serialize
+holon.add_self(db.get_pending_tasks, key="tasks") # callable → invoked at serialize
+holon.add_self({"static": "data"}, key="config")  # dict → stored as-is
 ```
 
-When the Holon is serialized, bindings resolve to their current values, enabling real-time state capture.
+When the Holon is serialized, callables resolve to their current values, enabling real-time state capture. Non-callable values are stored directly.
 
 ## Smart Serialization
 

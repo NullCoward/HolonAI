@@ -4,9 +4,11 @@ Container classes for Holon components - HolonPurpose, HolonSelf, and HolonActio
 
 from __future__ import annotations
 
+import types
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Union
 
 import attrs
+import cattrs
 
 from .action import HolonAction
 
@@ -14,24 +16,57 @@ if TYPE_CHECKING:
     from .holon import Holon
 
 
+def _is_function(obj: Any) -> bool:
+    """Check if obj is an actual function/lambda (not a callable class instance)."""
+    return isinstance(obj, (types.FunctionType, types.MethodType))
+
+
+def _unstructure_value(value: Any) -> Any:
+    """
+    Convert a value to a JSON-serializable form.
+
+    - Nested Holons use to_dict()
+    - Dataclasses/attrs classes use cattrs
+    - Regular class instances use __dict__
+    - Primitives pass through as-is
+    """
+    # Nested Holons
+    if hasattr(value, 'to_dict'):
+        return value.to_dict(nested=True)
+
+    # Try cattrs for dataclasses/attrs
+    try:
+        unstructured = cattrs.unstructure(value)
+        # cattrs returns the same object for unknown types, so check if it changed
+        if unstructured is not value:
+            return unstructured
+    except Exception:
+        pass
+
+    # Regular class instances with __dict__
+    if hasattr(value, '__dict__') and not _is_function(value):
+        return value.__dict__
+
+    return value
+
+
 @attrs.define
 class HolonBinding:
     """
     A binding to a code object that resolves its value at runtime.
 
-    Can bind to:
-    - A callable (function that returns the value)
-    - A direct value (returned as-is)
+    - Functions/lambdas are automatically invoked at resolve time
+    - Class instances are serialized via cattrs or __dict__
+    - Primitives are returned as-is
     """
     source: Union[Callable[[], Any], Any] = attrs.field(repr=False)
-    is_dynamic: bool = False
     key: str | None = None
 
     def resolve(self) -> Any:
         """Resolve the binding to its current value."""
-        if self.is_dynamic and callable(self.source):
+        if _is_function(self.source):
             return self.source()
-        return self.source
+        return _unstructure_value(self.source)
 
 
 @attrs.define
@@ -48,15 +83,10 @@ class HolonPurpose:
         self,
         item: Any,
         *,
-        key: str | None = None,
-        bind: bool = False
+        key: str | None = None
     ) -> HolonPurpose:
         """Add an item to the purpose."""
-        self._items.append(HolonBinding(
-            source=item,
-            is_dynamic=bind and callable(item),
-            key=key
-        ))
+        self._items.append(HolonBinding(source=item, key=key))
         return self
 
     def _has_any_keys(self) -> bool:
@@ -110,15 +140,10 @@ class HolonSelf:
         self,
         item: Any,
         *,
-        key: str | None = None,
-        bind: bool = False
+        key: str | None = None
     ) -> HolonSelf:
         """Add an item to self."""
-        self._items.append(HolonBinding(
-            source=item,
-            is_dynamic=bind and callable(item),
-            key=key
-        ))
+        self._items.append(HolonBinding(source=item, key=key))
         return self
 
     def _has_any_keys(self) -> bool:
@@ -127,15 +152,9 @@ class HolonSelf:
     def _all_have_keys(self) -> bool:
         return bool(self._items) and all(item.key is not None for item in self._items)
 
-    def _resolve_value(self, value: Any) -> Any:
-        """Resolve a value, handling nested Holons."""
-        if hasattr(value, 'to_dict'):
-            return value.to_dict(nested=True)
-        return value
-
     def resolve(self) -> list[Any]:
         """Resolve all bindings as a list."""
-        return [self._resolve_value(item.resolve()) for item in self._items]
+        return [item.resolve() for item in self._items]
 
     def serialize(self) -> list[Any] | dict[str, Any]:
         """Smart serialization: list if unkeyed, dict if keyed, mixed handled."""
@@ -143,17 +162,14 @@ class HolonSelf:
             return []
 
         if self._all_have_keys():
-            return {
-                item.key: self._resolve_value(item.resolve())
-                for item in self._items
-            }
+            return {item.key: item.resolve() for item in self._items}
         elif not self._has_any_keys():
             return self.resolve()
         else:
             # Mixed: list with keyed items as embedded dicts
             result = []
             for item in self._items:
-                value = self._resolve_value(item.resolve())
+                value = item.resolve()
                 if item.key is not None:
                     result.append({item.key: value})
                 else:

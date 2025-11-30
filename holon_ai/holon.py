@@ -45,22 +45,20 @@ class Holon:
         self,
         item: Any,
         *,
-        key: str | None = None,
-        bind: bool = False
+        key: str | None = None
     ) -> Holon:
         """Add an item to this Holon's purpose."""
-        self.purpose.add(item, key=key, bind=bind)
+        self.purpose.add(item, key=key)
         return self
 
     def add_self(
         self,
         item: Any,
         *,
-        key: str | None = None,
-        bind: bool = False
+        key: str | None = None
     ) -> Holon:
         """Add an item to this Holon's self state."""
-        self.self_state.add(item, key=key, bind=bind)
+        self.self_state.add(item, key=key)
         return self
 
     def add_action(
@@ -88,14 +86,14 @@ class Holon:
         """
         Current token count for the serialized Holon.
 
-        Requires tiktoken: pip install holon-ai[tokens]
+        Requires tiktoken: pip install tiktoken
         """
         from .tokens import TokenCounter, TIKTOKEN_AVAILABLE
 
         if not TIKTOKEN_AVAILABLE:
             raise ImportError(
                 "Token counting requires the 'tiktoken' package. "
-                "Install with: pip install holon-ai[tokens]"
+                "Install with: pip install tiktoken"
             )
 
         data = self.to_dict()

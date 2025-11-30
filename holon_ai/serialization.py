@@ -95,8 +95,8 @@ def estimate_token_savings(holon: Holon) -> dict[str, Any]:
     """
     if not TOON_AVAILABLE:
         raise ImportError(
-            "Token estimation requires the 'toon' package. "
-            "Install with: pip install toon"
+            "Token estimation requires the 'python-toon' package. "
+            "Install with: pip install python-toon"
         )
 
     data = holon_converter.unstructure_holon(holon)

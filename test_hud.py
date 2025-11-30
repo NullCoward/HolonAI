@@ -56,8 +56,8 @@ holon = (
     .add_purpose("When in doubt, ask clarifying questions before taking action")
 
     # Self: keyed dictionary of state
-    .add_self(get_current_user, key="user", bind=True)
-    .add_self(get_pending_tasks, key="tasks", bind=True)
+    .add_self(get_current_user, key="user")
+    .add_self(get_pending_tasks, key="tasks")
     .add_self({"timezone": "America/New_York", "theme": "dark"}, key="preferences")
     .add_self({"sprint": "2024-Q1-W3", "team_velocity": 42}, key="context")
 

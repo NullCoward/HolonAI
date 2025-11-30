@@ -60,7 +60,7 @@ class TokenCounter:
         if not TIKTOKEN_AVAILABLE:
             raise ImportError(
                 "Token counting requires the 'tiktoken' package. "
-                "Install with: pip install holon-ai[tokens]"
+                "Install with: pip install tiktoken"
             )
 
         # Determine encoding to use
