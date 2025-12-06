@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Human-Holon Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Human-Holon Interface</h1>
+            <div class="interface-info">
+                <span class="guid">GUID: {{ interface.id }}</span>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <!-- Left Panel: Holon List -->
+            <aside class="holon-list-panel">
+                <h2>Connected Holons</h2>
+                <div id="holon-list"></div>
+            </aside>
+
+            <!-- Center Panel: Selected Holon Details -->
+            <main class="holon-detail-panel">
+                <div id="no-selection" class="placeholder">
+                    <p>Select a holon to view its details</p>
+                </div>
+                <div id="holon-detail" style="display: none;">
+                    <div class="holon-header">
+                        <h2 id="holon-title">Holon</h2>
+                        <div class="holon-status">
+                            <span id="heart-status" class="status-badge"></span>
+                            <span id="token-badge" class="token-badge"></span>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab active" data-tab="purpose">Purpose</button>
+                        <button class="tab" data-tab="self">Self</button>
+                        <button class="tab" data-tab="knowledge">Knowledge</button>
+                        <button class="tab" data-tab="actions">Actions</button>
+                        <button class="tab" data-tab="messages">Messages</button>
+                        <button class="tab" data-tab="children">Children</button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content">
+                        <div id="purpose-tab" class="tab-pane active">
+                            <div class="editor-header">
+                                <h3>Purpose Bindings</h3>
+                                <button onclick="savePurpose()" class="btn btn-primary">Save</button>
+                            </div>
+                            <textarea id="purpose-editor" class="json-editor"></textarea>
+                        </div>
+
+                        <div id="self-tab" class="tab-pane">
+                            <div class="editor-header">
+                                <h3>Self State</h3>
+                                <button onclick="refreshSelf()" class="btn">Refresh</button>
+                            </div>
+                            <pre id="self-display" class="json-display"></pre>
+                        </div>
+
+                        <div id="knowledge-tab" class="tab-pane">
+                            <div class="editor-header">
+                                <h3>Knowledge</h3>
+                                <button onclick="saveKnowledge()" class="btn btn-primary">Save</button>
+                            </div>
+                            <textarea id="knowledge-editor" class="json-editor"></textarea>
+                        </div>
+
+                        <div id="actions-tab" class="tab-pane">
+                            <h3>Available Actions</h3>
+                            <div id="actions-list"></div>
+                            <div class="action-executor">
+                                <h4>Execute Action</h4>
+                                <select id="action-select"></select>
+                                <textarea id="action-params" placeholder='{"param": "value"}'></textarea>
+                                <button onclick="executeAction()" class="btn btn-primary">Execute</button>
+                                <pre id="action-result"></pre>
+                            </div>
+                        </div>
+
+                        <div id="messages-tab" class="tab-pane">
+                            <h3>Message History</h3>
+                            <div id="message-list"></div>
+                            <div class="message-composer">
+                                <h4>Send Message</h4>
+                                <input type="text" id="msg-recipients" placeholder="Recipient IDs (comma separated)">
+                                <textarea id="msg-content" placeholder="Message content"></textarea>
+                                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
+                            </div>
+                        </div>
+
+                        <div id="children-tab" class="tab-pane">
+                            <div class="editor-header">
+                                <h3>Children</h3>
+                                <button onclick="createChild()" class="btn btn-primary">Create Child</button>
+                            </div>
+                            <div id="children-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel: HUD Preview -->
+            <aside class="hud-panel">
+                <h2>HUD Preview</h2>
+                <button onclick="refreshHUD()" class="btn">Refresh</button>
+                <pre id="hud-preview"></pre>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        let selectedHolonId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHolonList();
+            setupTabs();
+        });
+
+        // Tab switching
+        function setupTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
+                });
+            });
+        }
+
+        // Load holon list
+        async function loadHolonList() {
+            const response = await fetch('/api/holons');
+            const holons = await response.json();
+            const list = document.getElementById('holon-list');
+
+            if (holons.length === 0) {
+                list.innerHTML = '<p class="no-holons">No holons connected</p>';
+                return;
+            }
+
+            list.innerHTML = holons.map(h => `
+                <div class="holon-item ${h.id === selectedHolonId ? 'selected' : ''}" onclick="selectHolon('${h.id}')">
+                    <div class="holon-item-id">${h.id.substring(0, 8)}...</div>
+                    <div class="holon-item-meta">
+                        <span class="badge badge-info">${h.token_bank} tokens</span>
+                        <span class="badge badge-muted">${h.children_count} children</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Select a holon
+        async function selectHolon(id) {
+            selectedHolonId = id;
+            document.getElementById('no-selection').style.display = 'none';
+            document.getElementById('holon-detail').style.display = 'block';
+
+            const response = await fetch(`/api/holon/${id}`);
+            const holon = await response.json();
+
+            // Update header
+            document.getElementById('holon-title').textContent = `Holon ${id.substring(0, 8)}...`;
+            document.getElementById('heart-status').textContent = `${holon.heart_rate_secs}s heartbeat`;
+            document.getElementById('heart-status').className = 'status-badge status-active';
+            document.getElementById('token-badge').textContent = `${holon.token_bank} tokens`;
+
+            // Load tab content
+            document.getElementById('purpose-editor').value = JSON.stringify(holon.purpose, null, 2);
+            document.getElementById('self-display').textContent = JSON.stringify(holon.self_state, null, 2);
+            document.getElementById('knowledge-editor').value = JSON.stringify(holon.knowledge, null, 2);
+
+            // Load actions
+            const actionsList = document.getElementById('actions-list');
+            const actionSelect = document.getElementById('action-select');
+            actionsList.innerHTML = holon.actions.map(a => `
+                <div class="action-item">
+                    <strong>${a.name}</strong>
+                    <span>${a.purpose || ''}</span>
+                </div>
+            `).join('');
+            actionSelect.innerHTML = holon.actions.map(a => `
+                <option value="${a.name}">${a.name}</option>
+            `).join('');
+
+            // Load messages
+            await loadMessages();
+
+            // Load children
+            await loadChildren();
+
+            // Refresh HUD
+            await refreshHUD();
+
+            // Update list selection
+            loadHolonList();
+        }
+
+        // Save purpose
+        async function savePurpose() {
+            if (!selectedHolonId) return;
+            try {
+                const value = JSON.parse(document.getElementById('purpose-editor').value);
+                await fetch(`/api/holon/${selectedHolonId}/purpose`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({value})
+                });
+                alert('Purpose saved!');
+                refreshHUD();
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+
+        // Refresh self state
+        async function refreshSelf() {
+            if (!selectedHolonId) return;
+            const response = await fetch(`/api/holon/${selectedHolonId}/self`);
+            const self = await response.json();
+            document.getElementById('self-display').textContent = JSON.stringify(self, null, 2);
+        }
+
+        // Save knowledge
+        async function saveKnowledge() {
+            if (!selectedHolonId) return;
+            try {
+                const value = JSON.parse(document.getElementById('knowledge-editor').value);
+                await fetch(`/api/holon/${selectedHolonId}/knowledge`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({value})
+                });
+                alert('Knowledge saved!');
+                refreshHUD();
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+
+        // Execute action
+        async function executeAction() {
+            if (!selectedHolonId) return;
+            const actionName = document.getElementById('action-select').value;
+            let params = {};
+            try {
+                const paramsText = document.getElementById('action-params').value.trim();
+                if (paramsText) params = JSON.parse(paramsText);
+            } catch (e) {
+                alert('Invalid params JSON: ' + e.message);
+                return;
+            }
+
+            const response = await fetch(`/api/holon/${selectedHolonId}/action/${actionName}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(params)
+            });
+            const result = await response.json();
+            document.getElementById('action-result').textContent = JSON.stringify(result, null, 2);
+            refreshHUD();
+        }
+
+        // Load messages
+        async function loadMessages() {
+            if (!selectedHolonId) return;
+            const response = await fetch(`/api/holon/${selectedHolonId}/messages`);
+            const messages = await response.json();
+            const list = document.getElementById('message-list');
+
+            if (messages.length === 0) {
+                list.innerHTML = '<p class="no-messages">No messages</p>';
+                return;
+            }
+
+            list.innerHTML = messages.map(m => `
+                <div class="message-item ${m.sender_id === selectedHolonId ? 'sent' : 'received'}">
+                    <div class="message-header">
+                        <span class="sender">${m.sender_id.substring(0, 8)}...</span>
+                        <span class="timestamp">${new Date(m.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="message-content">${JSON.stringify(m.content)}</div>
+                </div>
+            `).join('');
+        }
+
+        // Send message
+        async function sendMessage() {
+            if (!selectedHolonId) return;
+            const recipientIds = document.getElementById('msg-recipients').value.split(',').map(s => s.trim()).filter(s => s);
+            const content = document.getElementById('msg-content').value;
+
+            await fetch(`/api/holon/${selectedHolonId}/message`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({recipient_ids: recipientIds, content})
+            });
+
+            document.getElementById('msg-recipients').value = '';
+            document.getElementById('msg-content').value = '';
+            loadMessages();
+        }
+
+        // Load children
+        async function loadChildren() {
+            if (!selectedHolonId) return;
+            const response = await fetch(`/api/holon/${selectedHolonId}/children`);
+            const children = await response.json();
+            const list = document.getElementById('children-list');
+
+            if (children.length === 0) {
+                list.innerHTML = '<p class="no-children">No children</p>';
+                return;
+            }
+
+            list.innerHTML = children.map(c => `
+                <div class="child-item" onclick="selectHolon('${c.id}')">
+                    <div class="child-id">${c.id.substring(0, 8)}...</div>
+                    <div class="child-meta">
+                        <span class="badge badge-info">${c.token_bank} tokens</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Create child
+        async function createChild() {
+            if (!selectedHolonId) return;
+            const response = await fetch(`/api/holon/${selectedHolonId}/child`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({})
+            });
+            const result = await response.json();
+            if (result.success) {
+                loadChildren();
+                loadHolonList();
+            }
+        }
+
+        // Refresh HUD
+        async function refreshHUD() {
+            if (!selectedHolonId) return;
+            const response = await fetch(`/api/holon/${selectedHolonId}/hud`);
+            const hud = await response.json();
+            document.getElementById('hud-preview').textContent = JSON.stringify(hud, null, 2);
+        }
+    </script>
+</body>
+</html>

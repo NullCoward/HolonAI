@@ -84,3 +84,14 @@ if _storage_available:
         "HolonicStorage",
         "SQLStorage",
     ])
+
+# Interface is optional (requires flask)
+try:
+    from .interface import InterfaceHolon, create_app
+    _interface_available = True
+    __all__.extend([
+        "InterfaceHolon",
+        "create_app",
+    ])
+except ImportError:
+    _interface_available = False

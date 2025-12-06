@@ -168,22 +168,27 @@ class TestHolonicObjectHeartbeatRecord:
         """Test creating a record."""
         hobj = HolonicObject()
         hud = hobj.to_dict()
-        record = HolonicObjectHeartbeatRecord(hobj=hobj, hud_sent=hud)
+        scheduled_time = datetime.now(timezone.utc)
+        record = HolonicObjectHeartbeatRecord(hobj=hobj, hud_sent=hud, scheduled_time=scheduled_time)
 
         assert record.hobj is hobj
         assert record.hud_sent == hud
+        assert record.scheduled_time == scheduled_time
         assert record.actions_result == {}
 
     def test_record_with_actions(self):
         """Test record with actions result."""
         hobj = HolonicObject()
         hud = hobj.to_dict()
+        scheduled_time = datetime.now(timezone.utc)
         record = HolonicObjectHeartbeatRecord(
             hobj=hobj,
             hud_sent=hud,
+            scheduled_time=scheduled_time,
             actions_result={"actions": [{"action": "test"}]}
         )
 
+        assert record.scheduled_time == scheduled_time
         assert len(record.actions_result["actions"]) == 1
 
 

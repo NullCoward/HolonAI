@@ -30,23 +30,33 @@ class HolonicObjectHeartbeatRecord:
     """Record of a single HolonicObject's participation in a heartbeat."""
     hobj: "HolonicObject"
     hud_sent: dict[str, Any]
+    scheduled_time: datetime  # When this holon was scheduled to heartbeat
     actions_result: dict[str, Any] = attrs.field(factory=dict)
 
 
 @attrs.define
 class Heartbeat:
     """A single heartbeat cycle - records all interaction for history."""
-    heartbeat_time: datetime
+    heartbeat_time: datetime  # When this heartbeat cycle started
+    execution_time: datetime | None = attrs.field(default=None)  # When AI call started
+    completion_time: datetime | None = attrs.field(default=None)  # When AI call completed
     _records: list[HolonicObjectHeartbeatRecord] = attrs.field(factory=list)
     _full_prompt: str = attrs.field(default="")
     _raw_response: str = attrs.field(default="")
     _parsed_response: dict[str, Any] = attrs.field(factory=dict)
 
-    def add_holonicobject(self, hobj: "HolonicObject") -> None:
+    def add_holonicobject(self, hobj: "HolonicObject", scheduled_time: datetime | None = None) -> None:
         """Add a HolonicObject to this heartbeat and capture its serialized HUD."""
         import copy
         hud = copy.deepcopy(hobj.to_dict())
-        self._records.append(HolonicObjectHeartbeatRecord(hobj=hobj, hud_sent=hud))
+        # Use the holon's next_heartbeat as scheduled time if not provided
+        if scheduled_time is None:
+            scheduled_time = hobj.next_heartbeat
+        self._records.append(HolonicObjectHeartbeatRecord(
+            hobj=hobj,
+            hud_sent=hud,
+            scheduled_time=scheduled_time,
+        ))
 
     def get_holonicobjects(self) -> list["HolonicObject"]:
         """Get list of all HolonicObjects in this heartbeat."""
@@ -61,12 +71,20 @@ class Heartbeat:
 
     def build_prompt(self) -> str:
         """Build the combined prompt for AI submission."""
+        # Build holon data with timestamps
+        holons_data = {}
+        for record in self._records:
+            holon_data = record.hud_sent.copy()
+            holon_data["_heartbeat_info"] = {
+                "scheduled_time": record.scheduled_time.isoformat(),
+                "active_heartbeat": record.hobj._active_heartbeat_info() if hasattr(record.hobj, '_active_heartbeat_info') else None,
+            }
+            holons_data[record.hobj.id] = holon_data
+
         combined_data = {
             "heartbeat_time": self.heartbeat_time.isoformat(),
-            "holons": {
-                record.hobj.id: record.hud_sent
-                for record in self._records
-            }
+            "execution_time": self.execution_time.isoformat() if self.execution_time else None,
+            "holons": holons_data,
         }
         self._full_prompt = f"""You are processing a heartbeat for multiple holons. Each holon has its own purpose, state, and available actions.
 
@@ -149,6 +167,11 @@ class HolonicHeart:
     _history: list[Heartbeat] = attrs.field(factory=list, init=False)
     _on_heartbeat: Callable[[Heartbeat], None] | None = attrs.field(default=None)
 
+    @property
+    def is_running(self) -> bool:
+        """Check if the heart is currently beating."""
+        return self._running
+
     def start(self) -> None:
         """Start the heartbeat loop in a background thread."""
         if self._running:
@@ -204,9 +227,14 @@ class HolonicHeart:
 
             # Create heartbeat and add all due HolonicObjects
             heartbeat = Heartbeat(heartbeat_time=heartbeat_time)
-            for hobj, _ in due_holons:
-                heartbeat.add_holonicobject(hobj)
+            for hobj, scheduled_time in due_holons:
+                heartbeat.add_holonicobject(hobj, scheduled_time=scheduled_time)
+                # Mark each holon as having an active heartbeat
+                hobj.mark_heartbeat_started(scheduled_time=scheduled_time)
                 telemetry.record_hobj_heartbeat(hobj.id)
+
+            # Set execution time just before AI call
+            heartbeat.execution_time = datetime.now(timezone.utc)
 
             # Build prompt and call AI
             prompt = heartbeat.build_prompt()
@@ -222,11 +250,15 @@ class HolonicHeart:
                     structured_output=self.structured_output and detect_client_type(self.client) == "openai"
                 )
 
+            # Set completion time after AI call
+            heartbeat.completion_time = datetime.now(timezone.utc)
+
             response_tokens = count_tokens(response_text)
             log_ai_response(response_tokens, ai_timer.duration_ms)
             telemetry.record_ai_call(ai_timer.duration_ms, prompt_tokens, response_tokens)
 
             # Process response and dispatch to HolonicObjects
+            # (dispatch_to_holonicobjects calls action_results which clears active heartbeat)
             heartbeat.process_response(response_text)
             heartbeat.dispatch_to_holonicobjects()
 

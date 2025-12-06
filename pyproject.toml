@@ -31,10 +31,14 @@ dependencies = [
 storage = [
     "sqlalchemy>=2.0",
 ]
+interface = [
+    "flask>=3.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "sqlalchemy>=2.0",
+    "flask>=3.0",
 ]
 
 [project.urls]
