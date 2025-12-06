@@ -497,37 +497,59 @@ class TestMessagePersistence:
 
     def test_save_message(self, storage):
         """Test saving a message."""
-        msg_id = storage.save_message(
-            from_id="hobj-1",
-            to_id="hobj-2",
+        storage.save_message(
+            message_id="msg-001",
+            sender_id="hobj-1",
+            recipient_ids=["hobj-2"],
             content="Hello!",
         )
-        assert msg_id > 0
+        # Verify by getting
+        msgs = storage.get_messages("hobj-1", direction="sent")
+        assert len(msgs) == 1
+        assert msgs[0]["id"] == "msg-001"
+        assert msgs[0]["sender_id"] == "hobj-1"
+        assert msgs[0]["recipient_ids"] == ["hobj-2"]
+        assert msgs[0]["content"] == "Hello!"
 
     def test_get_messages_sent(self, storage):
         """Test getting sent messages."""
-        storage.save_message("hobj-1", "hobj-2", "Message 1")
-        storage.save_message("hobj-1", "hobj-3", "Message 2")
-        storage.save_message("hobj-2", "hobj-1", "Reply")
+        storage.save_message("msg-1", "hobj-1", ["hobj-2"], "Message 1")
+        storage.save_message("msg-2", "hobj-1", ["hobj-3"], "Message 2")
+        storage.save_message("msg-3", "hobj-2", ["hobj-1"], "Reply")
 
         sent = storage.get_messages("hobj-1", direction="sent")
         assert len(sent) == 2
 
     def test_get_messages_received(self, storage):
         """Test getting received messages."""
-        storage.save_message("hobj-1", "hobj-2", "Message 1")
-        storage.save_message("hobj-3", "hobj-2", "Message 2")
+        storage.save_message("msg-1", "hobj-1", ["hobj-2"], "Message 1")
+        storage.save_message("msg-2", "hobj-3", ["hobj-2"], "Message 2")
 
         received = storage.get_messages("hobj-2", direction="received")
         assert len(received) == 2
 
     def test_get_messages_both(self, storage):
         """Test getting all messages."""
-        storage.save_message("hobj-1", "hobj-2", "Sent")
-        storage.save_message("hobj-2", "hobj-1", "Received")
+        storage.save_message("msg-1", "hobj-1", ["hobj-2"], "Sent")
+        storage.save_message("msg-2", "hobj-2", ["hobj-1"], "Received")
 
         all_msgs = storage.get_messages("hobj-1", direction="both")
         assert len(all_msgs) == 2
+
+    def test_message_with_tokens(self, storage):
+        """Test saving a message with tokens attached."""
+        storage.save_message(
+            message_id="msg-tokens",
+            sender_id="hobj-1",
+            recipient_ids=["hobj-2", "hobj-3"],
+            content={"type": "request", "data": "test"},
+            tokens_attached=100,
+        )
+        msgs = storage.get_messages("hobj-1", direction="sent")
+        assert len(msgs) == 1
+        assert msgs[0]["tokens_attached"] == 100
+        assert msgs[0]["recipient_ids"] == ["hobj-2", "hobj-3"]
+        assert msgs[0]["content"] == {"type": "request", "data": "test"}
 
 
 class TestTelemetryPersistence:

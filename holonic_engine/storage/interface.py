@@ -124,15 +124,23 @@ class HolonicStorage(Protocol):
 
     def save_message(
         self,
-        from_id: str,
-        to_id: str,
-        content: str,
+        message_id: str,
+        sender_id: str,
+        recipient_ids: list[str],
+        content: Any,
+        tokens_attached: int = 0,
         timestamp: datetime | None = None,
-    ) -> int:
+    ) -> None:
         """
         Save a message between hobjs.
 
-        Returns the message ID.
+        Args:
+            message_id: The message GUID
+            sender_id: Sender holon GUID
+            recipient_ids: List of recipient holon GUIDs
+            content: Message content (will be JSON serialized)
+            tokens_attached: Number of tokens attached
+            timestamp: Message timestamp (defaults to now)
         """
         ...
 

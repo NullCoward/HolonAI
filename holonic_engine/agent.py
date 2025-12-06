@@ -624,6 +624,16 @@ class HolonicObject(Holon):
             message: The message to add
         """
         self.message_history.add(message)
+        # Persist message if storage is bound
+        if self._storage is not None:
+            self._storage.save_message(
+                message.id,
+                message.sender_id,
+                message.recipient_ids,
+                message.content,
+                message.tokens_attached,
+                message.timestamp,
+            )
 
     def send_message(self, recipient_ids: str | list[str], content: Any, tokens: int = 0) -> Message:
         """Send a message to one or more holons by GUID. Optionally attach tokens."""

@@ -444,7 +444,7 @@ class SQLStorage:
         parent: "HolonicObject | None",
     ) -> "HolonicObject":
         """Recursively restore a holon tree."""
-        from ..agent import HolonicObject
+        from ..agent import HolonicObject, Message
 
         # Create hobj
         hobj = HolonicObject(holon_parent=parent)
@@ -464,6 +464,19 @@ class SQLStorage:
         # Restore holon self_state if available
         if data.get('holon') and data['holon'].get('self_state'):
             hobj._self_bindings.update(data['holon']['self_state'])
+
+        # Restore message history from storage
+        stored_messages = self.get_messages(hobj.id, direction="both", limit=1000)
+        for msg_data in stored_messages:
+            message = Message(
+                sender_id=msg_data['sender_id'],
+                id=msg_data['id'],
+                recipient_ids=msg_data['recipient_ids'],
+                content=msg_data['content'],
+                tokens_attached=msg_data['tokens_attached'],
+                timestamp=msg_data['timestamp'],
+            )
+            hobj.message_history.add(message)
 
         # Restore children
         for child_data in data.get('children', []):
@@ -604,26 +617,31 @@ class SQLStorage:
 
     def save_message(
         self,
-        from_id: str,
-        to_id: str,
-        content: str,
+        message_id: str,
+        sender_id: str,
+        recipient_ids: list[str],
+        content: Any,
+        tokens_attached: int = 0,
         timestamp: datetime | None = None,
-    ) -> int:
+    ) -> None:
         """Save a message between hobjs."""
         if timestamp is None:
             timestamp = datetime.now(timezone.utc)
 
+        content_json = json.dumps(content) if not isinstance(content, str) else content
+
         with self.engine.connect() as conn:
-            result = conn.execute(
+            conn.execute(
                 messages.insert().values(
-                    from_id=from_id,
-                    to_id=to_id,
-                    content=content,
+                    id=message_id,
+                    sender_id=sender_id,
+                    recipient_ids=json.dumps(recipient_ids),
+                    content=content_json,
+                    tokens_attached=tokens_attached,
                     timestamp=timestamp,
                 )
             )
             conn.commit()
-            return result.lastrowid
 
     def get_messages(
         self,
@@ -634,11 +652,13 @@ class SQLStorage:
         """Get messages for a hobj."""
         with self.engine.connect() as conn:
             if direction == "sent":
-                condition = messages.c.from_id == hobj_id
+                condition = messages.c.sender_id == hobj_id
             elif direction == "received":
-                condition = messages.c.to_id == hobj_id
+                # Check if hobj_id is in the recipient_ids JSON array
+                # This is a simple LIKE check - works for SQLite/PostgreSQL
+                condition = messages.c.recipient_ids.contains(hobj_id)
             else:
-                condition = (messages.c.from_id == hobj_id) | (messages.c.to_id == hobj_id)
+                condition = (messages.c.sender_id == hobj_id) | messages.c.recipient_ids.contains(hobj_id)
 
             query = (
                 select(messages)
@@ -652,9 +672,10 @@ class SQLStorage:
             return [
                 {
                     "id": row.id,
-                    "from_id": row.from_id,
-                    "to_id": row.to_id,
-                    "content": row.content,
+                    "sender_id": row.sender_id,
+                    "recipient_ids": json.loads(row.recipient_ids),
+                    "content": json.loads(row.content) if row.content.startswith('{') or row.content.startswith('[') else row.content,
+                    "tokens_attached": row.tokens_attached,
                     "timestamp": row.timestamp,
                 }
                 for row in rows

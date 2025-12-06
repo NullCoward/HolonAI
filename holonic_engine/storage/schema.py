@@ -98,13 +98,13 @@ heartbeat_hobjs = Table(
 messages = Table(
     "messages",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("from_id", String(36), nullable=False),
-    Column("to_id", String(36), nullable=False),
+    Column("id", String(36), primary_key=True),  # Message GUID
+    Column("sender_id", String(36), nullable=False),
+    Column("recipient_ids", Text, nullable=False),  # JSON array of recipient GUIDs
     Column("content", Text, nullable=False),
+    Column("tokens_attached", Integer, default=0),
     Column("timestamp", DateTime, nullable=False),
-    Index("ix_messages_from", "from_id"),
-    Index("ix_messages_to", "to_id"),
+    Index("ix_messages_sender", "sender_id"),
     Index("ix_messages_timestamp", "timestamp"),
 )
 
