@@ -2,6 +2,7 @@
 Generic SQL storage implementation for HolonicEngine.
 
 Works with SQLite, PostgreSQL, MySQL, and other SQLAlchemy-supported databases.
+Supports encrypted SQLite via SQLCipher for portable .hln files.
 """
 
 from __future__ import annotations
@@ -9,8 +10,9 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote_plus
 
-from sqlalchemy import create_engine, select, delete, update, and_
+from sqlalchemy import create_engine, select, delete, update, and_, event
 from sqlalchemy.engine import Engine
 
 from .schema import (
@@ -30,25 +32,52 @@ if TYPE_CHECKING:
     from ..holon import Holon
 
 
+# Check if SQLCipher is available
+_SQLCIPHER_AVAILABLE = False
+try:
+    import sqlcipher3
+    _SQLCIPHER_AVAILABLE = True
+except ImportError:
+    pass
+
+
 class SQLStorage:
     """
     Generic SQL storage backend using SQLAlchemy Core.
 
     Supports any SQLAlchemy-compatible database:
     - SQLite: "sqlite:///path/to/db.sqlite" or "sqlite:///:memory:"
+    - Encrypted SQLite: SQLStorage("path/to/agent.hln", password="secret")
     - PostgreSQL: "postgresql://user:pass@host/dbname"
     - MySQL: "mysql://user:pass@host/dbname"
     """
 
-    def __init__(self, connection_string: str = "sqlite:///:memory:"):
+    def __init__(
+        self,
+        connection_string: str = "sqlite:///:memory:",
+        password: str | None = None,
+    ):
         """
         Initialize storage with a database connection string.
 
         Args:
-            connection_string: SQLAlchemy connection string.
+            connection_string: SQLAlchemy connection string, or just a file path
+                for encrypted .hln files (e.g., "agent.hln" or "/path/to/agent.hln").
                 Defaults to in-memory SQLite.
+            password: Optional password for SQLCipher encryption.
+                If provided with a file path, creates an encrypted database.
         """
-        self.connection_string = connection_string
+        self._password = password
+        self._file_path: str | None = None
+
+        # If password provided and connection_string looks like a file path,
+        # set up for encrypted SQLite
+        if password and not connection_string.startswith(("sqlite:", "postgresql:", "mysql:")):
+            self._file_path = connection_string
+            self.connection_string = f"sqlite:///{connection_string}"
+        else:
+            self.connection_string = connection_string
+
         self._engine: Engine | None = None
 
     @property
@@ -58,9 +87,32 @@ class SQLStorage:
             raise RuntimeError("Storage not connected. Call connect() first.")
         return self._engine
 
+    @property
+    def is_encrypted(self) -> bool:
+        """Check if this storage uses encryption."""
+        return self._password is not None
+
     def connect(self) -> None:
         """Establish connection to the database."""
-        self._engine = create_engine(self.connection_string)
+        if self._password and self.connection_string.startswith("sqlite:"):
+            # Use SQLCipher for encrypted SQLite
+            if not _SQLCIPHER_AVAILABLE:
+                raise RuntimeError(
+                    "SQLCipher not available. Install with: pip install sqlcipher3-binary"
+                )
+            # Create engine with SQLCipher
+            self._engine = create_engine(
+                self.connection_string,
+                module=sqlcipher3.dbapi2,
+            )
+            # Set the encryption key on each connection
+            @event.listens_for(self._engine, "connect")
+            def set_sqlite_pragma(dbapi_conn, connection_record):
+                cursor = dbapi_conn.cursor()
+                cursor.execute(f"PRAGMA key = '{self._password}'")
+                cursor.close()
+        else:
+            self._engine = create_engine(self.connection_string)
 
     def disconnect(self) -> None:
         """Close connection to the database."""

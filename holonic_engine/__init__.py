@@ -31,7 +31,7 @@ from .telemetry import HolonicTelemetry, get_telemetry, reset_telemetry, Timer
 
 # Storage is optional (requires sqlalchemy)
 try:
-    from .storage import HolonicStorage, SQLStorage
+    from .storage import HolonicStorage, SQLStorage, is_encryption_available, open_hln
     _storage_available = True
 except ImportError:
     _storage_available = False
@@ -83,6 +83,8 @@ if _storage_available:
     __all__.extend([
         "HolonicStorage",
         "SQLStorage",
+        "is_encryption_available",
+        "open_hln",
     ])
 
 # Interface is optional (requires flask)
