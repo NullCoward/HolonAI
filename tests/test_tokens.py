@@ -4,7 +4,7 @@ Tests for token counting functionality.
 
 import pytest
 
-from holon_ai import TokenCounter, count_tokens, tokens_available
+from holonic_engine import TokenCounter, count_tokens, tokens_available
 
 
 class TestTokensAvailable:

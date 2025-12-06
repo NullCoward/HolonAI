@@ -49,6 +49,7 @@ class Holon:
     # AI client for execution
     _client: Any = attrs.field(default=None, alias="_client")
     _max_tokens: int = attrs.field(default=4096, alias="_max_tokens")
+    _structured_output: bool = attrs.field(default=False, alias="_structured_output")
 
     # Fluent API for building Holons
 
@@ -129,6 +130,51 @@ class Holon:
         self._client = client
         self.model = model
         self._max_tokens = max_tokens
+        return self
+
+    def with_openai(
+        self,
+        *,
+        model: str = "gpt-4o",
+        api_key: str | None = None,
+        max_tokens: int = 4096,
+        structured_output: bool = True
+    ) -> Holon:
+        """
+        Configure internal OpenAI client with structured outputs (fluent API).
+
+        This is a convenience method that creates an OpenAI client internally
+        and enables structured outputs by default for guaranteed valid JSON
+        action responses.
+
+        Args:
+            model: OpenAI model to use (default: "gpt-4o")
+            api_key: OpenAI API key. If None, uses OPENAI_API_KEY env var.
+            max_tokens: Maximum tokens in AI response
+            structured_output: If True (default), use OpenAI's response_format
+                              to guarantee valid JSON. Eliminates parsing errors.
+
+        Example:
+            holon = (
+                Holon(name="Assistant")
+                .with_openai(model="gpt-4o-mini")  # Uses OPENAI_API_KEY env var
+                .add_purpose("You are a helpful assistant")
+                .add_action(my_action, name="do_thing")
+            )
+
+            # Or with explicit API key:
+            holon.with_openai(api_key="sk-...", model="gpt-4o")
+
+        Note:
+            Structured outputs guarantee valid JSON but may slightly increase
+            latency. Disable with structured_output=False if not needed.
+        """
+        from .client import create_openai_client
+
+        self._client = create_openai_client(api_key)
+        self.model = model
+        self._max_tokens = max_tokens
+        self._structured_output = structured_output
         return self
 
     # Token counting properties
@@ -268,8 +314,8 @@ class Holon:
 
         if self._client is None:
             raise RuntimeError(
-                "No AI client configured. Use with_client() first. "
-                "Example: holon.with_client(OpenAI(), model='gpt-4o')"
+                "No AI client configured. Use with_client() or with_openai() first. "
+                "Example: holon.with_openai(model='gpt-4o')"
             )
 
         # Serialize (resolves dynamic bindings)
@@ -284,7 +330,8 @@ class Holon:
             self._client,
             prompt,
             model=self.model,
-            max_tokens=self._max_tokens
+            max_tokens=self._max_tokens,
+            structured_output=self._structured_output
         )
 
         # Parse and dispatch

@@ -1,6 +1,6 @@
 # Serialization Pipeline
 
-HolonAI uses a multi-stage serialization process optimized for AI consumption.
+HolonicEngine uses a multi-stage serialization process optimized for AI consumption.
 
 ## Pipeline Overview
 
@@ -51,7 +51,7 @@ HolonAI uses a multi-stage serialization process optimized for AI consumption.
 
 ## Smart Serialization
 
-HolonAI automatically chooses the best format for your data:
+HolonicEngine automatically chooses the best format for your data:
 
 | Item Type | Serialized As |
 |-----------|---------------|
@@ -109,7 +109,7 @@ hikes[1]{id,name,distance}:
 Track token usage with tiktoken integration:
 
 ```python
-from holon_ai import Holon, count_tokens
+from holonic_engine import Holon, count_tokens
 
 holon = (
     Holon(name="Agent")
@@ -164,7 +164,7 @@ Multiple actions can be returned in a single response.
 ## Usage
 
 ```python
-from holon_ai import Holon, serialize_for_ai, parse_ai_response
+from holonic_engine import Holon, serialize_for_ai, parse_ai_response
 
 # Create and populate a Holon
 holon = (
@@ -195,7 +195,7 @@ results = holon.dispatch_many(action_calls)
 Serialization is handled by [cattrs](https://catt.rs/) with custom hooks registered in `converter.py`. This keeps serialization logic separate from model classes — you can customize or extend serialization without modifying the Holon class itself.
 
 ```python
-from holon_ai import holon_converter
+from holonic_engine import holon_converter
 
 # The global converter instance
 data = holon_converter.unstructure_holon(my_holon)

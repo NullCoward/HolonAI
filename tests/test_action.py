@@ -4,7 +4,7 @@ Tests for HolonAction, ActionParameter, and ActionSignature.
 
 import pytest
 
-from holon_ai import ActionParameter, ActionSignature, HolonAction
+from holonic_engine import ActionParameter, ActionSignature, HolonAction
 
 
 class TestActionParameter:
@@ -164,9 +164,9 @@ class TestHolonAction:
     def test_action_name_derivation_module(self):
         """Test that action name includes module for non-main functions."""
         # Import a function from the module
-        from holon_ai.tokens import count_tokens
+        from holonic_engine.tokens import count_tokens
         action = HolonAction(callback=count_tokens)
-        assert "holon_ai.tokens" in action.name
+        assert "holonic_engine.tokens" in action.name
 
     def test_action_with_lambda(self):
         """Test action created from lambda."""

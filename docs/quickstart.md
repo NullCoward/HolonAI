@@ -20,7 +20,7 @@ pip install -e .
 
 ```python
 from openai import OpenAI
-from holon_ai import Holon
+from holonic_engine import Holon
 
 # Define your actions
 def create_task(title: str, priority: str = "medium") -> dict:
@@ -57,7 +57,7 @@ print(result.actions_called) # What actions the AI chose
 
 ```python
 from anthropic import Anthropic
-from holon_ai import Holon
+from holonic_engine import Holon
 
 holon = (
     Holon(name="Assistant")
@@ -68,6 +68,43 @@ holon = (
 
 result = holon.execute("Help me with something")
 ```
+
+### Using Internal OpenAI (Recommended)
+
+For the simplest setup with the best reliability, use `with_openai()` which creates
+an internal OpenAI client and enables **structured outputs** by default:
+
+```python
+from holonic_engine import Holon
+
+# Uses OPENAI_API_KEY environment variable
+holon = (
+    Holon(name="Assistant")
+    .with_openai(model="gpt-4o")  # Structured outputs enabled by default!
+    .add_purpose("You are a helpful assistant")
+    .add_action(my_action, name="do_thing")
+)
+
+result = holon.execute("Do something")
+```
+
+**Why use structured outputs?**
+
+OpenAI's structured outputs use `response_format` with a JSON schema to *guarantee*
+valid action responses. This eliminates JSON parsing errors entirely — the AI is
+constrained to always return properly formatted `{"actions": [...]}` responses.
+
+```python
+# With explicit API key:
+holon.with_openai(api_key="sk-...", model="gpt-4o-mini")
+
+# Disable structured outputs if needed (falls back to prompting):
+holon.with_openai(model="gpt-4o", structured_output=False)
+```
+
+> **Note**: Structured outputs are only available with OpenAI models. The generic
+> `with_client()` method does not enable them (to preserve compatibility with
+> user-configured clients).
 
 ### Adding Dynamic Bindings
 
@@ -156,7 +193,7 @@ main_holon = (
 
 ```python
 from openai import OpenAI
-from holon_ai import Holon
+from holonic_engine import Holon
 
 # 1. Define your actions
 def send_email(to: str, subject: str, body: str) -> bool:
@@ -199,6 +236,7 @@ Holon(name: str | None = None)
 
 **Methods:**
 - `.with_client(client, *, model, max_tokens=4096)` - Configure AI client (OpenAI or Anthropic)
+- `.with_openai(*, model="gpt-4o", api_key=None, max_tokens=4096, structured_output=True)` - Configure internal OpenAI client with structured outputs
 - `.with_token_limit(limit, model=None)` - Set token limit
 - `.add_purpose(item, *, key=None)` - Add to purpose
 - `.add_self(item, *, key=None)` - Add to self state
@@ -237,7 +275,7 @@ ExecutionResult(
 For advanced use cases, you can manually serialize and dispatch:
 
 ```python
-from holon_ai import serialize_for_ai, parse_ai_response
+from holonic_engine import serialize_for_ai, parse_ai_response
 
 # Serialize to prompt
 prompt = serialize_for_ai(holon, format="toon")

@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from holon_ai import Holon, serialize_for_ai, parse_ai_response
+from holonic_engine import Holon, serialize_for_ai, parse_ai_response
 
 
 # Check for API availability

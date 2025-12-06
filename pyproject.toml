@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "holon-ai"
+name = "holonic-engine"
 version = "0.1.0"
-description = "A library for building AI agent systems"
+description = "A library for building AI agent systems using Holonic architecture"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -34,12 +34,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/NullCoward/HolonAI"
-Repository = "https://github.com/NullCoward/HolonAI"
+Homepage = "https://github.com/NullCoward/HolonicEngine"
+Repository = "https://github.com/NullCoward/HolonicEngine"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["holon_ai*"]
+include = ["holonic_engine*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

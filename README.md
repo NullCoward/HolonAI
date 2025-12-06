@@ -1,4 +1,4 @@
-# HolonAI
+# HolonicEngine
 
 A Python library for building AI agent systems using the **Holon** abstraction.
 
@@ -22,21 +22,21 @@ A Holon is a portable AI context capsule that bundles everything an AI needs to 
 ## Installation
 
 ```bash
-pip install git+https://github.com/NullCoward/HolonAI.git
+pip install git+https://github.com/NullCoward/HolonicEngine.git
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/NullCoward/HolonAI.git
-cd HolonAI
+git clone https://github.com/NullCoward/HolonicEngine.git
+cd HolonicEngine
 pip install -e .
 ```
 
 ## Quick Example
 
 ```python
-from holon_ai import Holon, serialize_for_ai, parse_ai_response
+from holonic_engine import Holon, serialize_for_ai, parse_ai_response
 
 # Define actions
 def create_task(title: str, priority: str = "medium") -> dict:
@@ -106,8 +106,8 @@ holon.token_usage       # Full breakdown dict
 ## Development
 
 ```bash
-git clone https://github.com/NullCoward/HolonAI.git
-cd HolonAI
+git clone https://github.com/NullCoward/HolonicEngine.git
+cd HolonicEngine
 pip install -e ".[dev]"
 pytest
 ```

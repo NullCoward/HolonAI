@@ -1,8 +1,8 @@
-# HolonAI Architecture
+# HolonicEngine Architecture
 
 ## Overview
 
-HolonAI is a library for building AI agent systems using the **Holon** abstraction — a portable AI context capsule that bundles everything an AI needs to understand and act.
+HolonicEngine is a library for building AI agent systems using the **Holon** abstraction — a portable AI context capsule that bundles everything an AI needs to understand and act.
 
 Built with [attrs](https://www.attrs.org/) for clean class definitions and [cattrs](https://catt.rs/) for flexible serialization.
 
@@ -177,8 +177,9 @@ holon.add_action(create_task, name="create_task", purpose="Create a task")
 ## Library Architecture
 
 ```
-holon_ai/
+holonic_engine/
 ├── holon.py        # Holon class with token management
+├── client.py       # AI client integration (OpenAI, Anthropic, structured outputs)
 ├── containers.py   # HolonPurpose, HolonSelf, HolonActions, HolonBinding
 ├── action.py       # HolonAction, ActionSignature, ActionParameter
 ├── converter.py    # cattrs-based serialization
@@ -187,3 +188,24 @@ holon_ai/
 ```
 
 Serialization rules are centralized in `converter.py`, separate from the model classes — following the cattrs philosophy of keeping un/structuring logic decoupled.
+
+## AI Client Integration
+
+HolonicEngine supports two modes of AI client configuration:
+
+### Generic Client (`with_client`)
+Accepts any OpenAI or Anthropic client instance. Maximum flexibility for custom configurations.
+
+### Internal OpenAI (`with_openai`)
+Creates an internal OpenAI client with **structured outputs** enabled by default. Uses OpenAI's `response_format` with JSON schema to guarantee valid action responses:
+
+```python
+# Guarantees responses match this schema:
+{
+    "actions": [
+        {"action": "action_name", "params": {...}}
+    ]
+}
+```
+
+This eliminates JSON parsing errors — the AI is constrained at the token generation level to produce valid output.

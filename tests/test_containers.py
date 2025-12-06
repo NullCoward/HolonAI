@@ -5,7 +5,7 @@ Tests for HolonBinding, HolonPurpose, HolonSelf, and HolonActions containers.
 import pytest
 import attrs
 
-from holon_ai import HolonAction, HolonBinding, HolonActions, HolonPurpose, HolonSelf
+from holonic_engine import HolonAction, HolonBinding, HolonActions, HolonPurpose, HolonSelf
 
 
 class TestHolonBinding:
@@ -181,7 +181,7 @@ class TestHolonSelf:
 
     def test_nested_holon_serialization(self):
         """Test that nested Holons are serialized properly."""
-        from holon_ai import Holon
+        from holonic_engine import Holon
 
         inner = Holon(name="InnerHolon")
         inner.add_purpose("Inner purpose")

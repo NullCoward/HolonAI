@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from holon_ai import (
+from holonic_engine import (
     Holon,
     HolonConverter,
     holon_converter,

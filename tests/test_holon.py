@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from holon_ai import Holon
+from holonic_engine import Holon
 
 
 class TestHolonCreation:

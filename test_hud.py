@@ -6,7 +6,7 @@ import json
 import sys
 sys.path.insert(0, '.')
 
-from holon_ai import Holon
+from holonic_engine import Holon
 
 # Simulate some data sources
 def get_current_user():
