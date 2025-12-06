@@ -142,6 +142,16 @@ HOLONS DATA:
         """The raw response text from AI."""
         return self._raw_response
 
+    @property
+    def is_complete(self) -> bool:
+        """Check if this heartbeat has completed (AI response received)."""
+        return self.completion_time is not None
+
+    @property
+    def is_active(self) -> bool:
+        """Check if this heartbeat is currently in progress (started but not completed)."""
+        return self.execution_time is not None and self.completion_time is None
+
     def __len__(self) -> int:
         return len(self._records)
 
@@ -218,7 +228,11 @@ class HolonicHeart:
             all_heartbeats = self.root.collect_due_heartbeats()
 
             # Filter for holons due before next second (non-inclusive) with non-negative token_bank
-            due_holons = [(hobj, ts) for hobj, ts in all_heartbeats if ts < next_second and hobj.token_bank >= 0]
+            # Also exclude holons that already have an active heartbeat in progress
+            due_holons = [
+                (hobj, ts) for hobj, ts in all_heartbeats
+                if ts < next_second and hobj.token_bank >= 0 and not hobj.has_active_heartbeat
+            ]
 
             if not due_holons:
                 return None
@@ -235,6 +249,9 @@ class HolonicHeart:
 
             # Set execution time just before AI call
             heartbeat.execution_time = datetime.now(timezone.utc)
+
+            # Store in history BEFORE AI call so other heartbeats can see it's active
+            self._history.append(heartbeat)
 
             # Build prompt and call AI
             prompt = heartbeat.build_prompt()
@@ -261,9 +278,6 @@ class HolonicHeart:
             # (dispatch_to_holonicobjects calls action_results which clears active heartbeat)
             heartbeat.process_response(response_text)
             heartbeat.dispatch_to_holonicobjects()
-
-            # Store in history
-            self._history.append(heartbeat)
 
         # Record telemetry
         telemetry.record_heartbeat(total_timer.duration_ms, len(due_holons))

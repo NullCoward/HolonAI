@@ -189,9 +189,6 @@ class HolonicObject(Holon):
     _active_heartbeat_start: datetime | None = attrs.field(default=None, repr=False)
     _active_heartbeat_scheduled: datetime | None = attrs.field(default=None, repr=False)
 
-    # Heartbeat parallelization - if True, allows concurrent heartbeats for this holon
-    _heartbeat_parallelization: bool = attrs.field(default=True, alias="heartbeat_parallelization")
-
     def __attrs_post_init__(self):
         """Bind state and actions to the Holon."""
         # Initialize default self bindings (dynamic references)
@@ -205,7 +202,6 @@ class HolonicObject(Holon):
             "next_heartbeat": lambda: self.next_heartbeat.isoformat(),
             "heart_rate_secs": lambda: self._heart_rate_secs,
             "active_heartbeat": lambda: self._active_heartbeat_info(),
-            "heartbeat_parallelization": lambda: self._heartbeat_parallelization,
         })
 
         # Built-in actions for self-management
@@ -216,7 +212,6 @@ class HolonicObject(Holon):
         self.add_action(self.create_child, name="create_child", purpose="Create a new child holon, optionally copying from a template GUID")
         self.add_action(self.send_message, name="send_message", purpose="Send a message to one or more holons by GUID")
         self.add_action(self.delay_heartbeat, name="sleep", purpose="Delay next heartbeat by specified seconds from its current scheduled time")
-        self.add_action(self.set_heartbeat_parallelization, name="set_heartbeat_parallelization", purpose="Enable or disable concurrent heartbeats for this holon")
 
     # =========================================================================
     # Properties with auto-persistence
@@ -242,17 +237,6 @@ class HolonicObject(Holon):
     def heart_rate_secs(self, value: int) -> None:
         """Set heart rate and auto-save if storage bound."""
         self._heart_rate_secs = value
-        self._auto_save()
-
-    @property
-    def heartbeat_parallelization(self) -> bool:
-        """Get whether heartbeat parallelization is enabled."""
-        return self._heartbeat_parallelization
-
-    @heartbeat_parallelization.setter
-    def heartbeat_parallelization(self, value: bool) -> None:
-        """Set heartbeat parallelization and auto-save if storage bound."""
-        self._heartbeat_parallelization = value
         self._auto_save()
 
     # =========================================================================
@@ -696,10 +680,6 @@ class HolonicObject(Holon):
         from datetime import timedelta
         self.next_heartbeat = self.next_heartbeat + timedelta(seconds=seconds)
         self._auto_save()
-
-    def set_heartbeat_parallelization(self, enabled: bool) -> None:
-        """Enable or disable concurrent heartbeats for this holon."""
-        self.heartbeat_parallelization = enabled
 
     def action_results(self, results: dict[str, Any], heartbeat_time: datetime) -> list[Any]:
         """Process action results from AI response. Dispatches actions and updates heartbeat times."""
