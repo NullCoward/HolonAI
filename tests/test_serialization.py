@@ -29,18 +29,6 @@ class TestHolonConverter:
         result = holon_converter.unstructure_holon(holon)
         assert result == {}
 
-    def test_unstructure_holon_with_name(self):
-        """Test unstructuring named Holon."""
-        holon = Holon(name="MyHolon")
-        result = holon_converter.unstructure_holon(holon)
-        assert result == {"name": "MyHolon"}
-
-    def test_unstructure_holon_nested_omits_name(self):
-        """Test that nested=True omits name."""
-        holon = Holon(name="Nested")
-        result = holon_converter.unstructure_holon(holon, nested=True)
-        assert "name" not in result
-
     def test_unstructure_action_parameter(self):
         """Test unstructuring action parameters."""
         def my_func(x: int, y: str = "default") -> bool:
@@ -107,31 +95,29 @@ class TestSerializeForAI:
 
     def test_serialize_json_format(self):
         """Test JSON serialization."""
-        holon = Holon(name="Test").add_purpose("Be helpful")
+        holon = Holon().add_purpose("Be helpful")
         result = serialize_for_ai(holon, format="json")
         data = json.loads(result)
-        assert data["name"] == "Test"
         assert data["purpose"] == ["Be helpful"]
 
     def test_serialize_toon_format(self):
         """Test TOON serialization (or fallback to JSON)."""
-        holon = Holon(name="Test").add_purpose("Be helpful")
+        holon = Holon().add_purpose("Be helpful")
         result = serialize_for_ai(holon, format="toon")
         # Result should be a non-empty string
         assert len(result) > 0
-        assert "Test" in result
 
     def test_serialize_unknown_format(self):
         """Test that unknown format raises error."""
-        holon = Holon(name="Test")
+        holon = Holon()
         with pytest.raises(ValueError, match="Unknown format"):
             serialize_for_ai(holon, format="xml")
 
     def test_serialize_default_format(self):
         """Test default format is toon."""
-        holon = Holon(name="Test")
+        holon = Holon()
         result = serialize_for_ai(holon)
-        assert len(result) > 0
+        assert isinstance(result, str)
 
     def test_serialize_complete_holon(self):
         """Test serializing a complete Holon."""
@@ -140,7 +126,7 @@ class TestSerializeForAI:
             return x * 2
 
         holon = (
-            Holon(name="Complete")
+            Holon()
             .add_purpose("Main purpose")
             .add_self({"key": "value"}, key="data")
             .add_action(my_action, name="my_action", purpose="Double input")
@@ -149,7 +135,6 @@ class TestSerializeForAI:
         result = serialize_for_ai(holon, format="json")
         data = json.loads(result)
 
-        assert data["name"] == "Complete"
         assert "purpose" in data
         assert "self" in data
         assert "actions" in data
@@ -219,7 +204,7 @@ class TestEstimateTokenSavings:
     def test_estimate_returns_dict(self):
         """Test that estimate returns a dict with comparison data."""
         holon = (
-            Holon(name="Test")
+            Holon()
             .add_purpose("Be helpful")
             .add_self({"key": "value"}, key="data")
         )
@@ -240,7 +225,7 @@ class TestRoundTrip:
         def add(a: int, b: int) -> int:
             return a + b
 
-        holon = Holon(name="Test").add_action(add, name="add", purpose="Add numbers")
+        holon = Holon().add_action(add, name="add", purpose="Add numbers")
         serialized = serialize_for_ai(holon, format="json")
         data = json.loads(serialized)
 
@@ -272,7 +257,7 @@ class TestRoundTrip:
             return {"status": "ok", "logs": len(results_log)}
 
         holon = (
-            Holon(name="Logger")
+            Holon()
             .add_purpose("Log messages and track status")
             .add_self(lambda: {"log_count": len(results_log)}, key="state")
             .add_action(log_message, name="log_message", purpose="Log a message")
@@ -283,7 +268,6 @@ class TestRoundTrip:
         serialized = serialize_for_ai(holon, format="json")
         data = json.loads(serialized)
 
-        assert data["name"] == "Logger"
         assert len(data["actions"]) == 2
 
         # Simulate AI response with multiple actions

@@ -183,14 +183,13 @@ class TestHolonSelf:
         """Test that nested Holons are serialized properly."""
         from holonic_engine import Holon
 
-        inner = Holon(name="InnerHolon")
+        inner = Holon()
         inner.add_purpose("Inner purpose")
 
         self_state = HolonSelf()
         self_state.add(inner, key="nested")
         result = self_state.serialize()
 
-        # Nested holon should be serialized without name
         assert "nested" in result
         assert "purpose" in result["nested"]
 

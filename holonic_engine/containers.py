@@ -32,7 +32,7 @@ def _unstructure_value(value: Any) -> Any:
     """
     # Nested Holons
     if hasattr(value, 'to_dict'):
-        return value.to_dict(nested=True)
+        return value.to_dict()
 
     # Try cattrs for dataclasses/attrs
     try:

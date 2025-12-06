@@ -1,18 +1,19 @@
 """
-Holon - The core object that combines Purpose, Self, and Actions.
+Holon - The core architectural object that combines Purpose, Self, and Actions.
+
+A Holon is a pure data structure representing an AI context capsule.
+It contains no execution logic or token management - those concerns
+belong to the HolonicAgent that wraps it.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable
 
 import attrs
 
 from .action import HolonAction
 from .containers import HolonActions, HolonPurpose, HolonSelf
-
-if TYPE_CHECKING:
-    from .client import ExecutionResult
 
 
 @attrs.define
@@ -28,28 +29,12 @@ class Holon:
     Holons can be nested - a Holon's Self can contain other Holons,
     creating hierarchical structures that flatten during serialization.
 
-    Token Management:
-    - token_limit: Maximum tokens allowed for this Holon's serialization
-    - model: Model name for token counting (affects encoding used)
-    - token_count: Current token count (dynamic property)
-
-    Execution:
-    - Use with_client() to configure an AI client (OpenAI or Anthropic)
-    - Use execute() to run the full pipeline: serialize -> AI call -> dispatch
+    This is a pure architectural object with no execution logic.
+    For AI execution and token management, see HolonicAgent.
     """
-    name: str | None = None
     purpose: HolonPurpose = attrs.Factory(HolonPurpose)
     self_state: HolonSelf = attrs.Factory(HolonSelf)
     actions: HolonActions = attrs.Factory(HolonActions)
-
-    # Token management
-    token_limit: int | None = None
-    model: str | None = None  # e.g., "gpt-4o", "gpt-4", "claude-sonnet-4-20250514"
-
-    # AI client for execution
-    _client: Any = attrs.field(default=None, alias="_client")
-    _max_tokens: int = attrs.field(default=4096, alias="_max_tokens")
-    _structured_output: bool = attrs.field(default=False, alias="_structured_output")
 
     # Fluent API for building Holons
 
@@ -84,178 +69,12 @@ class Holon:
         self.actions.add(action, name=name, purpose=purpose)
         return self
 
-    def with_token_limit(self, limit: int, model: str | None = None) -> Holon:
-        """Set token limit (fluent API)."""
-        self.token_limit = limit
-        if model:
-            self.model = model
-        return self
-
-    def with_client(
-        self,
-        client: Any,
-        *,
-        model: str,
-        max_tokens: int = 4096
-    ) -> Holon:
-        """
-        Configure an AI client for execution (fluent API).
-
-        Supports OpenAI and Anthropic clients directly.
-
-        Args:
-            client: An OpenAI or Anthropic client instance
-            model: Model to use (e.g., "gpt-4o", "claude-sonnet-4-20250514")
-            max_tokens: Maximum tokens in AI response
-
-        Example:
-            from openai import OpenAI
-
-            holon = (
-                Holon(name="Assistant")
-                .with_client(OpenAI(), model="gpt-4o")
-                .add_purpose("You are a helpful assistant")
-                .add_action(my_action, name="do_thing")
-            )
-        """
-        from .client import detect_client_type
-
-        client_type = detect_client_type(client)
-        if client_type is None:
-            raise TypeError(
-                f"Unsupported client type: {type(client).__name__}. "
-                "Supported clients: OpenAI, Anthropic"
-            )
-
-        self._client = client
-        self.model = model
-        self._max_tokens = max_tokens
-        return self
-
-    def with_openai(
-        self,
-        *,
-        model: str = "gpt-4o",
-        api_key: str | None = None,
-        max_tokens: int = 4096,
-        structured_output: bool = True
-    ) -> Holon:
-        """
-        Configure internal OpenAI client with structured outputs (fluent API).
-
-        This is a convenience method that creates an OpenAI client internally
-        and enables structured outputs by default for guaranteed valid JSON
-        action responses.
-
-        Args:
-            model: OpenAI model to use (default: "gpt-4o")
-            api_key: OpenAI API key. If None, uses OPENAI_API_KEY env var.
-            max_tokens: Maximum tokens in AI response
-            structured_output: If True (default), use OpenAI's response_format
-                              to guarantee valid JSON. Eliminates parsing errors.
-
-        Example:
-            holon = (
-                Holon(name="Assistant")
-                .with_openai(model="gpt-4o-mini")  # Uses OPENAI_API_KEY env var
-                .add_purpose("You are a helpful assistant")
-                .add_action(my_action, name="do_thing")
-            )
-
-            # Or with explicit API key:
-            holon.with_openai(api_key="sk-...", model="gpt-4o")
-
-        Note:
-            Structured outputs guarantee valid JSON but may slightly increase
-            latency. Disable with structured_output=False if not needed.
-        """
-        from .client import create_openai_client
-
-        self._client = create_openai_client(api_key)
-        self.model = model
-        self._max_tokens = max_tokens
-        self._structured_output = structured_output
-        return self
-
-    # Token counting properties
-
-    @property
-    def token_count(self) -> int:
-        """
-        Current token count for the serialized Holon.
-
-        Requires tiktoken: pip install tiktoken
-        """
-        from .tokens import TokenCounter, TIKTOKEN_AVAILABLE
-
-        if not TIKTOKEN_AVAILABLE:
-            raise ImportError(
-                "Token counting requires the 'tiktoken' package. "
-                "Install with: pip install tiktoken"
-            )
-
-        data = self.to_dict()
-        return TokenCounter.count_json(data, model=self.model)
-
-    @property
-    def tokens_remaining(self) -> int | None:
-        """
-        Tokens remaining before hitting limit.
-
-        Returns None if no limit is set.
-        """
-        if self.token_limit is None:
-            return None
-        return self.token_limit - self.token_count
-
-    @property
-    def is_over_limit(self) -> bool:
-        """
-        Check if current token count exceeds the limit.
-
-        Returns False if no limit is set.
-        """
-        if self.token_limit is None:
-            return False
-        return self.token_count > self.token_limit
-
-    @property
-    def token_usage(self) -> dict[str, Any]:
-        """
-        Get detailed token usage information.
-
-        Returns dict with count, limit, remaining, over_limit, and percentage.
-        """
-        count = self.token_count
-        result = {
-            "count": count,
-            "limit": self.token_limit,
-            "model": self.model,
-        }
-
-        if self.token_limit is not None:
-            result["remaining"] = self.token_limit - count
-            result["over_limit"] = count > self.token_limit
-            result["percentage"] = round((count / self.token_limit) * 100, 1)
-        else:
-            result["remaining"] = None
-            result["over_limit"] = False
-            result["percentage"] = None
-
-        return result
-
     # Serialization
 
-    def to_dict(self, *, nested: bool = False) -> dict[str, Any]:
-        """
-        Serialize the Holon to a dictionary.
-
-        Args:
-            nested: If True, this is a nested Holon (no intro text needed)
-        """
-        # Use the converter for serialization
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the Holon to a dictionary."""
         from .converter import holon_converter
-        return holon_converter.unstructure_holon(self, nested=nested)
+        return holon_converter.unstructure_holon(self)
 
     def to_json(self, **kwargs) -> str:
         """Serialize to JSON string."""
@@ -282,70 +101,3 @@ class Holon:
             result = self.dispatch(action_name, **params)
             results.append(result)
         return results
-
-    # Execution
-
-    def execute(self, user_message: str | None = None) -> "ExecutionResult":
-        """
-        Execute the full AI interaction pipeline.
-
-        1. Serialize the Holon (resolves all dynamic bindings)
-        2. Append user message if provided
-        3. Send to configured AI client
-        4. Parse the AI response for action calls
-        5. Dispatch all actions
-        6. Return results
-
-        Args:
-            user_message: Optional message from user to append to prompt
-
-        Returns:
-            ExecutionResult with prompt, response, actions, and results
-
-        Raises:
-            RuntimeError: If no client configured (use with_client first)
-
-        Example:
-            result = holon.execute("Create a new task called 'Review PR'")
-            print(result.results)  # Results from executed actions
-        """
-        from .client import ExecutionResult, call_ai
-        from .serialization import parse_ai_response, serialize_for_ai
-
-        if self._client is None:
-            raise RuntimeError(
-                "No AI client configured. Use with_client() or with_openai() first. "
-                "Example: holon.with_openai(model='gpt-4o')"
-            )
-
-        # Serialize (resolves dynamic bindings)
-        prompt = serialize_for_ai(self)
-
-        # Append user message if provided
-        if user_message:
-            prompt = f"{prompt}\n\nUser: {user_message}"
-
-        # Call AI
-        ai_response = call_ai(
-            self._client,
-            prompt,
-            model=self.model,
-            max_tokens=self._max_tokens,
-            structured_output=self._structured_output
-        )
-
-        # Parse and dispatch
-        try:
-            actions_called = parse_ai_response(ai_response)
-        except (ValueError, Exception):
-            # AI didn't return valid action format
-            actions_called = []
-
-        results = self.dispatch_many(actions_called) if actions_called else []
-
-        return ExecutionResult(
-            prompt=prompt,
-            ai_response=ai_response,
-            actions_called=actions_called,
-            results=results
-        )

@@ -92,18 +92,14 @@ class HolonConverter:
 
         return result
 
-    def unstructure_holon(self, holon: Holon, *, nested: bool = False) -> dict[str, Any]:
+    def unstructure_holon(self, holon: Holon) -> dict[str, Any]:
         """
         Convert a Holon to a dictionary.
 
         Args:
             holon: The Holon to convert
-            nested: If True, omit the name (nested Holons don't need it)
         """
         result = {}
-
-        if holon.name and not nested:
-            result["name"] = holon.name
 
         # Purpose: smart serialize (list or dict)
         purpose_data = holon.purpose.serialize()

@@ -6,7 +6,7 @@ import json
 import sys
 sys.path.insert(0, '.')
 
-from holonic_engine import Holon
+from holonic_engine import Holon, HolonicObject
 
 # Simulate some data sources
 def get_current_user():
@@ -42,19 +42,9 @@ def send_notification(user_id: int, message: str, urgent: bool = False) -> bool:
     return True
 
 
-# Build the Holon with token limit
-holon = (
-    Holon(name="TaskAssistant")
-
-    # Set token limit for GPT-4o
-    .with_token_limit(4000, model="gpt-4o")
-
-    # Purpose: unkeyed list of instructions
-    .add_purpose("You are a task management assistant for a software development team")
-    .add_purpose("Help users organize, prioritize, and track their work")
-    .add_purpose("Be concise and action-oriented in your responses")
-    .add_purpose("When in doubt, ask clarifying questions before taking action")
-
+# Build a HolonicObject (which IS-A Holon with hierarchy capabilities)
+obj = (
+    HolonicObject()
     # Self: keyed dictionary of state
     .add_self(get_current_user, key="user")
     .add_self(get_pending_tasks, key="tasks")
@@ -68,30 +58,51 @@ holon = (
     .add_action(send_notification, purpose="Send a notification to alert someone")
 )
 
+# Purpose: JSON structure with dot.path access
+obj.purpose_set("role", "You are a task management assistant for a software development team")
+obj.purpose_set("guidelines.help", "Help users organize, prioritize, and track their work")
+obj.purpose_set("guidelines.style", "Be concise and action-oriented in your responses")
+obj.purpose_set("guidelines.clarify", "When in doubt, ask clarifying questions before taking action")
+
 # Serialize and display
 print("=" * 70)
 print("                         HOLON HUD")
 print("=" * 70)
 print()
 
-hud = holon.to_dict()
+hud = obj.to_dict()
 print(json.dumps(hud, indent=2))
 
 print()
 print("=" * 70)
-print("                      TOKEN USAGE")
+print("                     HOLONIC OBJECT DEMO")
 print("=" * 70)
 print()
 
-usage = holon.token_usage
-print(f"  Model:          {usage['model']}")
-print(f"  Token Count:    {usage['count']}")
-print(f"  Token Limit:    {usage['limit']}")
-print(f"  Remaining:      {usage['remaining']}")
-print(f"  Usage:          {usage['percentage']}%")
-print(f"  Over Limit:     {usage['over_limit']}")
+print(f"Object ID: {obj.id}")
+
+# Set some knowledge
+obj.knowledge_set("config.max_tasks", 10)
+obj.knowledge_set("config.notifications_enabled", True)
+print(f"Knowledge: {json.dumps(obj.knowledge, indent=2)}")
+
+# Create child objects
+worker1 = obj.create_child()
+worker2 = obj.create_child()
+
+# Set purpose on children using dot.path
+obj.child_purpose_set(worker1.id, "role", "Handle high-priority tasks")
+obj.child_purpose_set(worker2.id, "role", "Handle documentation tasks")
+
+print(f"\nChildren: {[c.id for c in obj.holon_children]}")
+print(f"Worker1 purpose: {worker1.purpose_get()}")
+print(f"Worker2 purpose: {worker2.purpose_get()}")
+
+# Send a message
+msg = obj.send_message([worker1.id, worker2.id], {"type": "task_update", "count": 3})
+print(f"\nSent message: {msg.content}")
+print(f"Worker1 received messages: {len(worker1.get_received_messages())}")
+print(f"Worker2 received messages: {len(worker2.get_received_messages())}")
 
 print()
-print("=" * 70)
-print(f"Holon: {holon.name}")
 print("=" * 70)
