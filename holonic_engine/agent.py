@@ -185,9 +185,6 @@ class HolonicObject(Holon):
     # Storage binding for auto-persistence (optional)
     _storage: Any = attrs.field(default=None, repr=False)
 
-    # Active heartbeat tracking (set when heartbeat in progress)
-    _active_heartbeat_start: datetime | None = attrs.field(default=None, repr=False)
-    _active_heartbeat_scheduled: datetime | None = attrs.field(default=None, repr=False)
 
     def __attrs_post_init__(self):
         """Bind state and actions to the Holon."""
@@ -201,7 +198,6 @@ class HolonicObject(Holon):
             "last_heartbeat": lambda: self.last_heartbeat.isoformat() if self.last_heartbeat else None,
             "next_heartbeat": lambda: self.next_heartbeat.isoformat(),
             "heart_rate_secs": lambda: self._heart_rate_secs,
-            "active_heartbeat": lambda: self._active_heartbeat_info(),
         })
 
         # Built-in actions for self-management
@@ -696,39 +692,9 @@ class HolonicObject(Holon):
         from datetime import timedelta
         self.last_heartbeat = heartbeat_time
         self.next_heartbeat = heartbeat_time + timedelta(seconds=self._heart_rate_secs)
-        # Clear active heartbeat tracking
-        self._active_heartbeat_start = None
-        self._active_heartbeat_scheduled = None
         action_calls = results.get("actions", [])
         results = self.dispatch_many(action_calls)
         self._auto_save()  # Save after heartbeat processing
         return results
-
-    # Active heartbeat tracking
-
-    def _active_heartbeat_info(self) -> dict[str, Any] | None:
-        """Get info about any active/in-flight heartbeat for this holon."""
-        if self._active_heartbeat_start is None:
-            return None
-        return {
-            "execution_started": self._active_heartbeat_start.isoformat(),
-            "scheduled_time": self._active_heartbeat_scheduled.isoformat() if self._active_heartbeat_scheduled else None,
-            "elapsed_seconds": (datetime.now(timezone.utc) - self._active_heartbeat_start).total_seconds(),
-        }
-
-    def mark_heartbeat_started(self, scheduled_time: datetime | None = None) -> None:
-        """Mark that a heartbeat has started for this holon (AI call in progress)."""
-        self._active_heartbeat_start = datetime.now(timezone.utc)
-        self._active_heartbeat_scheduled = scheduled_time
-
-    def mark_heartbeat_completed(self) -> None:
-        """Mark that the heartbeat has completed."""
-        self._active_heartbeat_start = None
-        self._active_heartbeat_scheduled = None
-
-    @property
-    def has_active_heartbeat(self) -> bool:
-        """Check if this holon has an active heartbeat in progress."""
-        return self._active_heartbeat_start is not None
 
 

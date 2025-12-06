@@ -44,6 +44,8 @@ class Heartbeat:
     _full_prompt: str = attrs.field(default="")
     _raw_response: str = attrs.field(default="")
     _parsed_response: dict[str, Any] = attrs.field(factory=dict)
+    _errored: bool = attrs.field(default=False)  # True if heartbeat failed/was incomplete on startup
+    _error_message: str = attrs.field(default="")
 
     def add_holonicobject(self, hobj: "HolonicObject", scheduled_time: datetime | None = None) -> None:
         """Add a HolonicObject to this heartbeat and capture its serialized HUD."""
@@ -77,7 +79,6 @@ class Heartbeat:
             holon_data = record.hud_sent.copy()
             holon_data["_heartbeat_info"] = {
                 "scheduled_time": record.scheduled_time.isoformat(),
-                "active_heartbeat": record.hobj._active_heartbeat_info() if hasattr(record.hobj, '_active_heartbeat_info') else None,
             }
             holons_data[record.hobj.id] = holon_data
 
@@ -149,8 +150,22 @@ HOLONS DATA:
 
     @property
     def is_active(self) -> bool:
-        """Check if this heartbeat is currently in progress (started but not completed)."""
-        return self.execution_time is not None and self.completion_time is None
+        """Check if this heartbeat is currently in progress (started but not completed, and not errored)."""
+        return self.execution_time is not None and self.completion_time is None and not self._errored
+
+    @property
+    def is_errored(self) -> bool:
+        """Check if this heartbeat was marked as errored (e.g., incomplete on startup)."""
+        return self._errored
+
+    def mark_errored(self, message: str = "Incomplete heartbeat found on startup") -> None:
+        """Mark this heartbeat as errored. Used for cleanup of incomplete heartbeats."""
+        self._errored = True
+        self._error_message = message
+
+    def get_hobj_ids(self) -> set[str]:
+        """Get the IDs of all HolonicObjects in this heartbeat."""
+        return {r.hobj.id for r in self._records}
 
     def __len__(self) -> int:
         return len(self._records)
@@ -227,11 +242,14 @@ class HolonicHeart:
             # Collect all (holon, next_heartbeat) pairs from the tree
             all_heartbeats = self.root.collect_due_heartbeats()
 
+            # Get IDs of holons already in active heartbeats (from history)
+            active_hobj_ids = self.get_active_hobj_ids()
+
             # Filter for holons due before next second (non-inclusive) with non-negative token_bank
             # Also exclude holons that already have an active heartbeat in progress
             due_holons = [
                 (hobj, ts) for hobj, ts in all_heartbeats
-                if ts < next_second and hobj.token_bank >= 0 and not hobj.has_active_heartbeat
+                if ts < next_second and hobj.token_bank >= 0 and hobj.id not in active_hobj_ids
             ]
 
             if not due_holons:
@@ -243,8 +261,6 @@ class HolonicHeart:
             heartbeat = Heartbeat(heartbeat_time=heartbeat_time)
             for hobj, scheduled_time in due_holons:
                 heartbeat.add_holonicobject(hobj, scheduled_time=scheduled_time)
-                # Mark each holon as having an active heartbeat
-                hobj.mark_heartbeat_started(scheduled_time=scheduled_time)
                 telemetry.record_hobj_heartbeat(hobj.id)
 
             # Set execution time just before AI call
@@ -289,6 +305,28 @@ class HolonicHeart:
     def history(self) -> list[Heartbeat]:
         """Get the history of all heartbeats."""
         return list(self._history)
+
+    def get_active_hobj_ids(self) -> set[str]:
+        """Get IDs of all HolonicObjects currently in an active (in-flight) heartbeat."""
+        active_ids: set[str] = set()
+        for heartbeat in self._history:
+            if heartbeat.is_active:
+                active_ids.update(heartbeat.get_hobj_ids())
+        return active_ids
+
+    def cleanup_incomplete(self) -> int:
+        """
+        Mark any incomplete heartbeats as errored.
+
+        Call this on startup to clean up heartbeats that were in-flight when
+        the engine previously shut down. Returns the number of heartbeats marked.
+        """
+        count = 0
+        for heartbeat in self._history:
+            if heartbeat.is_active:
+                heartbeat.mark_errored("Incomplete heartbeat found on engine startup")
+                count += 1
+        return count
 
     def on_heartbeat(self, callback: Callable[[Heartbeat], None]) -> None:
         """Register a callback for heartbeat results."""
